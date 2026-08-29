@@ -224,7 +224,7 @@ export function loadConfig() {
       process.env.CONVEX_SITE_URL ||
       (process.env.NEXT_PUBLIC_CONVEX_URL
         ? `${process.env.NEXT_PUBLIC_CONVEX_URL.replace(/\.cloud$/, ".site")}/api/events/ingest`
-        : "https://clever-labrador-928.convex.site/api/events/ingest"),
+        : "https://opulent-caterpillar-373.convex.site/api/events/ingest"),
     enabled: true,
     deviceName: `${os.hostname()} (${os.platform()})`,
     createdAt: new Date().toISOString(),

@@ -115,7 +115,7 @@ describe("Collector Engine", () => {
     });
 
     const result = await sendEventBatch({
-      endpointUrl: "https://clever-labrador-928.convex.site/api/events/ingest",
+      endpointUrl: "https://events.smithery.ai/ingest",
       installationId: "i1",
       sessionId: "s1",
       source: "claude-code",
