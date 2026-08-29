@@ -6,7 +6,7 @@ import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@hackathon-craft-station/backend/convex/_generated/api";
 import { SocialPostCard, HyperFramesPlayer } from "@hackathon-craft-station/image-renderer";
 import type { ImageManifest } from "@hackathon-craft-station/shared-types";
-import { toBlob } from "html-to-image";
+import { toBlob, toPng } from "html-to-image";
 import { toast } from "sonner";
 import { BufferIntegrationModal } from "@/components/buffer-integration-modal";
 import {
@@ -37,6 +37,14 @@ import {
   Send,
   Clock3,
   ChevronDown,
+  MessageSquare,
+  Heart,
+  Repeat2,
+  Globe,
+  ZoomIn,
+  ZoomOut,
+  ImageIcon,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -49,7 +57,8 @@ export default function DashboardPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [mobileSection, setMobileSection] = useState<"feed" | "studio">("feed");
 
-  // Post editor state
+  // Post preview & editor state
+  const [postViewMode, setPostViewMode] = useState<"feed" | "editor">("feed");
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editedHook, setEditedHook] = useState("");
   const [editedBody, setEditedBody] = useState("");
@@ -58,14 +67,17 @@ export default function DashboardPage() {
   const [isBufferModalOpen, setIsBufferModalOpen] = useState(false);
   const [isPublishingBuffer, setIsPublishingBuffer] = useState(false);
   const [showBufferMenu, setShowBufferMenu] = useState(false);
+  const [includeCardInBuffer, setIncludeCardInBuffer] = useState(true);
 
   // Visual card customizer state (Apple HIG Palette)
   const [customAuthor, setCustomAuthor] = useState("Diego");
   const [customAccent, setCustomAccent] = useState("#0066cc");
   const [customTemplate, setCustomTemplate] = useState<"bug-fix" | "lesson" | "before-after">("bug-fix");
+  const [cardZoom, setCardZoom] = useState<number>(0.42);
   const [copied, setCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
 
   const generateUploadUrl = useMutation(api.assets.generateUploadUrl);
   const saveAsset = useMutation(api.assets.saveAsset);
@@ -247,7 +259,10 @@ export default function DashboardPage() {
     }
   };
 
-  const handlePublishToBuffer = async (mode: "addToQueue" | "now" | "idea") => {
+  const handlePublishToBuffer = async (
+    mode: "addToQueue" | "now" | "idea",
+    attachMedia: boolean = includeCardInBuffer
+  ) => {
     if (!activeMoment?._id) return;
     if (!bufferSettings?.apiKey) {
       toast.info("Abre la configuración de Buffer para conectar tu cuenta.");
@@ -255,11 +270,45 @@ export default function DashboardPage() {
       return;
     }
 
-
     try {
       setIsPublishingBuffer(true);
       setShowBufferMenu(false);
 
+      // 1. If media attachment is requested and draft exists, render & upload 4:5 card
+      if (attachMedia && mode !== "idea" && activeMoment.postDraft?._id) {
+        try {
+          const cardEl = document.getElementById("social-post-card");
+          if (cardEl) {
+            toast.info("Preparando y adjuntando tarjeta visual 4:5...");
+            const dataUrl = await toPng(cardEl, {
+              quality: 0.95,
+              pixelRatio: 1.5,
+              cacheBust: true,
+            });
+            const blob = await (await fetch(dataUrl)).blob();
+            const uploadUrl = await generateUploadUrl();
+            const uploadRes = await fetch(uploadUrl, {
+              method: "POST",
+              headers: { "Content-Type": "image/png" },
+              body: blob,
+            });
+            const { storageId } = await uploadRes.json();
+            if (storageId) {
+              await saveAsset({
+                postDraftId: activeMoment.postDraft._id,
+                storageId,
+                format: "png_1080x1350",
+                width: 1080,
+                height: 1350,
+              });
+            }
+          }
+        } catch (mediaErr) {
+          console.warn("Could not capture media for Buffer, proceeding with text:", mediaErr);
+        }
+      }
+
+      // 2. Dispatch to Buffer GraphQL API
       if (mode === "idea") {
         toast.info("Creando Idea en Buffer...");
         const res = await createBufferIdea({
@@ -275,8 +324,8 @@ export default function DashboardPage() {
       } else {
         toast.info(
           mode === "now"
-            ? "Publicando directamente a Buffer..."
-            : "Añadiendo a la cola de Buffer..."
+            ? "Publicando en Buffer con tarjeta visual..."
+            : "Añadiendo a la cola de Buffer con tarjeta visual..."
         );
         const res = await publishToBuffer({
           momentId: activeMoment._id,
@@ -286,8 +335,8 @@ export default function DashboardPage() {
         if (res.success) {
           toast.success(
             mode === "now"
-              ? "¡Publicado en Buffer exitosamente!"
-              : "¡Añadido a la cola de Buffer con éxito!",
+              ? "¡Publicado en Buffer exitosamente con imagen!"
+              : "¡Añadido a la cola de Buffer con imagen 4:5!",
             {
               description: `Canal: ${res.channelName || bufferSettings.channelName || "Canal configurado"}.`,
             }
@@ -302,6 +351,7 @@ export default function DashboardPage() {
       setIsPublishingBuffer(false);
     }
   };
+
 
   // Merged image manifest
   const activeManifest: ImageManifest = {
@@ -691,6 +741,38 @@ export default function DashboardPage() {
                           )}
                         </div>
 
+                        {/* View Switcher: Feed Simulator vs Editor */}
+                        <div className="apple-segmented-track p-0.5 flex items-center">
+                          <button
+                            onClick={() => {
+                              setIsEditingPost(false);
+                              setPostViewMode("feed");
+                            }}
+                            className={`px-3 py-1 text-xs font-medium rounded-full flex items-center gap-1.5 transition-all cursor-pointer ${
+                              !isEditingPost && postViewMode === "feed"
+                                ? "apple-segmented-thumb-active"
+                                : "text-[#6e6e73] dark:text-[#86868b]"
+                            }`}
+                          >
+                            <Eye className="size-3" />
+                            <span>Vista Feed</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleStartEdit();
+                              setPostViewMode("editor");
+                            }}
+                            className={`px-3 py-1 text-xs font-medium rounded-full flex items-center gap-1.5 transition-all cursor-pointer ${
+                              isEditingPost || postViewMode === "editor"
+                                ? "apple-segmented-thumb-active"
+                                : "text-[#6e6e73] dark:text-[#86868b]"
+                            }`}
+                          >
+                            <Edit3 className="size-3" />
+                            <span>Editor</span>
+                          </button>
+                        </div>
+
                         <div className="flex items-center gap-2 flex-wrap">
                           {isEditingPost ? (
                             <>
@@ -719,13 +801,6 @@ export default function DashboardPage() {
                                 <Zap className={`size-3.5 text-[#0066cc] dark:text-[#2997ff] ${isGeneratingAi ? "animate-spin" : ""}`} />
                                 <span>{isGeneratingAi ? "Sintetizando..." : "Gemini 2.5"}</span>
                               </button>
-                              <button
-                                onClick={handleStartEdit}
-                                className="apple-btn-secondary text-[12px] sm:text-[13px] py-1.5 px-3 min-h-[36px]"
-                              >
-                                <Edit3 className="size-3.5 mr-1" />
-                                <span>Editar</span>
-                              </button>
 
                               {/* Buffer Quick Publish Menu */}
                               <div className="relative">
@@ -737,7 +812,7 @@ export default function DashboardPage() {
                                     title={`Publicar en Buffer (${bufferSettings?.channelName || "Configurar"})`}
                                   >
                                     <Share2 className={`size-3.5 text-[#0066cc] dark:text-[#2997ff] ${isPublishingBuffer ? "animate-spin" : ""}`} />
-                                    <span>{isPublishingBuffer ? "Enviando..." : "Buffer"}</span>
+                                    <span>{isPublishingBuffer ? "Enviando..." : "Buffer + Imagen"}</span>
                                   </button>
                                   <button
                                     onClick={() => setShowBufferMenu((v) => !v)}
@@ -749,26 +824,36 @@ export default function DashboardPage() {
                                 </div>
 
                                 {showBufferMenu && (
-                                  <div className="absolute right-0 top-full mt-2 w-56 p-1.5 rounded-[18px] apple-acrylic-card border border-black/10 dark:border-white/15 shadow-xl z-30 flex flex-col gap-1 text-xs">
+                                  <div className="absolute right-0 top-full mt-2 w-64 p-1.5 rounded-[18px] apple-acrylic-card border border-black/10 dark:border-white/15 shadow-xl z-30 flex flex-col gap-1 text-xs">
                                     <button
-                                      onClick={() => handlePublishToBuffer("addToQueue")}
+                                      onClick={() => handlePublishToBuffer("addToQueue", true)}
                                       className="w-full text-left px-3 py-2 rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-between text-[#1d1d1f] dark:text-white cursor-pointer"
                                     >
                                       <span className="flex items-center gap-2">
                                         <Clock3 className="size-3.5 text-[#0066cc] dark:text-[#2997ff]" />
-                                        <span>Añadir a la Cola</span>
+                                        <span>Añadir a Cola + Tarjeta 4:5</span>
                                       </span>
                                       <span className="text-[10px] text-[#86868b] font-mono">Queue</span>
                                     </button>
                                     <button
-                                      onClick={() => handlePublishToBuffer("now")}
+                                      onClick={() => handlePublishToBuffer("now", true)}
                                       className="w-full text-left px-3 py-2 rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-between text-[#1d1d1f] dark:text-white cursor-pointer"
                                     >
                                       <span className="flex items-center gap-2">
                                         <Send className="size-3.5 text-[#30d158]" />
-                                        <span>Publicar Ahora</span>
+                                        <span>Publicar Ahora + Tarjeta</span>
                                       </span>
                                       <span className="text-[10px] text-[#86868b] font-mono">Now</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handlePublishToBuffer("addToQueue", false)}
+                                      className="w-full text-left px-3 py-2 rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-between text-[#1d1d1f] dark:text-white cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <Copy className="size-3.5 text-[#86868b]" />
+                                        <span>Solo Texto (Sin Imagen)</span>
+                                      </span>
+                                      <span className="text-[10px] text-[#86868b] font-mono">Text</span>
                                     </button>
                                     <button
                                       onClick={() => handlePublishToBuffer("idea")}
@@ -776,7 +861,7 @@ export default function DashboardPage() {
                                     >
                                       <span className="flex items-center gap-2">
                                         <Sparkles className="size-3.5 text-[#ff9f0a]" />
-                                        <span>Guardar como Idea</span>
+                                        <span>Guardar como Idea en Buffer</span>
                                       </span>
                                       <span className="text-[10px] text-[#86868b] font-mono">Idea</span>
                                     </button>
@@ -789,7 +874,7 @@ export default function DashboardPage() {
                                       className="w-full text-left px-3 py-2 rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2 text-[#0066cc] dark:text-[#2997ff] cursor-pointer"
                                     >
                                       <SlidersHorizontal className="size-3.5" />
-                                      <span>Configurar Buffer</span>
+                                      <span>Configurar Cuenta de Buffer</span>
                                     </button>
                                   </div>
                                 )}
@@ -816,50 +901,176 @@ export default function DashboardPage() {
                         </div>
                       </div>
 
-
-                      {/* Post Content Box */}
+                      {/* Post Viewport: Realistic Feed Simulator or Raw Editor */}
                       {isEditingPost ? (
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-4 p-5 rounded-[22px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08]">
                           <div>
-                            <label className="text-[11px] uppercase font-semibold text-[#6e6e73] dark:text-[#86868b]">
-                              Hook Inicial
-                            </label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] uppercase font-semibold text-[#6e6e73] dark:text-[#86868b]">
+                                Hook Inicial (Apertura con Vulnerabilidad)
+                              </label>
+                              <span className="text-[11px] font-mono text-[#6e6e73]">
+                                {editedHook.length} car.
+                              </span>
+                            </div>
                             <input
                               type="text"
                               value={editedHook}
                               onChange={(e) => setEditedHook(e.target.value)}
-                              className="apple-input-capsule w-full mt-1 text-xs sm:text-sm py-2 px-3"
+                              className="apple-input-capsule w-full text-xs sm:text-sm py-2.5 px-4 font-medium"
+                              placeholder="Ej: Hoy casi dudo de mis habilidades por un bug..."
                             />
                           </div>
+
                           <div>
-                            <label className="text-[11px] uppercase font-semibold text-[#6e6e73] dark:text-[#86868b]">
-                              Cuerpo de la Publicación
-                            </label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] uppercase font-semibold text-[#6e6e73] dark:text-[#86868b]">
+                                Cuerpo del Post (Historia en 1ª Persona)
+                              </label>
+                              <span className="text-[11px] font-mono text-[#6e6e73]">
+                                {editedBody.length} / 3000 máx.
+                              </span>
+                            </div>
                             <textarea
-                              rows={10}
+                              rows={14}
                               value={editedBody}
                               onChange={(e) => setEditedBody(e.target.value)}
-                              className="w-full mt-1 p-3.5 rounded-[16px] bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] text-xs sm:text-sm text-[#1d1d1f] dark:text-white leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#0066cc]"
+                              className="w-full p-4 rounded-[18px] bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] text-xs sm:text-sm text-[#1d1d1f] dark:text-white leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#0066cc] font-sans"
                             />
                           </div>
                         </div>
                       ) : (
-                        <div className="p-4 sm:p-6 rounded-[18px] sm:rounded-[20px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/[0.06] text-[14px] sm:text-[15px] leading-relaxed flex flex-col gap-4 text-[#1d1d1f] dark:text-white">
-                          <p className="font-semibold text-[#0066cc] dark:text-[#2997ff] text-[15px] sm:text-[16px]">
+                        /* REALISTIC SOCIAL FEED SIMULATOR (LinkedIn / Twitter) */
+                        <div className="rounded-[24px] bg-white dark:bg-[#1a1a1c] border border-black/[0.08] dark:border-white/[0.1] p-5 sm:p-7 shadow-xl flex flex-col gap-4 text-[#1d1d1f] dark:text-[#f5f5f7]">
+                          {/* Feed Author Card Header */}
+                          <div className="flex items-start justify-between pb-3.5 border-b border-black/[0.06] dark:border-white/[0.08]">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="size-11 sm:size-12 rounded-full flex items-center justify-center font-bold text-white text-base shadow-md ring-2 ring-white/10"
+                                style={{ backgroundColor: customAccent }}
+                              >
+                                {customAuthor.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-sm sm:text-[15px] flex items-center gap-1.5">
+                                  <span>{customAuthor}</span>
+                                  <span className="inline-flex items-center justify-center size-3.5 rounded-full bg-[#0066cc] text-white text-[9px]">
+                                    ✓
+                                  </span>
+                                  <span className="text-xs text-[#6e6e73] dark:text-[#86868b] font-normal">
+                                    • 1er
+                                  </span>
+                                </div>
+                                <div className="text-xs text-[#6e6e73] dark:text-[#86868b] font-normal line-clamp-1">
+                                  Software Engineer | #LearnInPublic & Observability
+                                </div>
+                                <div className="text-[11px] text-[#86868b] flex items-center gap-1 mt-0.5">
+                                  <span>Recién publicado</span>
+                                  <span>•</span>
+                                  <Globe className="size-3" />
+                                </div>
+                              </div>
+                            </div>
+
+                            <span className="text-[11px] font-mono font-medium px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/10 text-[#0066cc] dark:text-[#2997ff]">
+                              LinkedIn Preview
+                            </span>
+                          </div>
+
+                          {/* Hook Line with Sky Blue Tint */}
+                          <p className="font-semibold text-[#0066cc] dark:text-[#2997ff] text-[15px] sm:text-[17px] leading-snug tracking-tight">
                             {activeMoment.postDraft?.hook || "Hoy casi dudo de mis habilidades por un bug... hasta que descubrí esto. 🐛👇"}
                           </p>
 
-                          <div className="whitespace-pre-line text-[#3a3a3c] dark:text-[#d1d1d6] text-xs sm:text-sm leading-relaxed">
+                          {/* Post Story Body */}
+                          <div className="whitespace-pre-line text-[#2c2c2e] dark:text-[#e5e5ea] text-[14px] sm:text-[15px] leading-relaxed font-sans">
                             {activeMoment.postDraft?.body || activeMoment.problem}
                           </div>
+
+                          {/* Hashtag Badges */}
                           {activeMoment.postDraft?.hashtags && (
-                            <div className="flex flex-wrap gap-1.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] text-[11px] sm:text-xs font-mono text-[#0066cc] dark:text-[#2997ff]">
+                            <div className="flex flex-wrap gap-2 pt-2 text-xs sm:text-[13px] font-mono text-[#0066cc] dark:text-[#2997ff]">
                               {activeMoment.postDraft.hashtags.map((tag: string, i: number) => (
-                                <span key={i}>{tag}</span>
+                                <span
+                                  key={i}
+                                  className="hover:underline cursor-pointer bg-[#0066cc]/5 dark:bg-[#2997ff]/10 px-2.5 py-0.5 rounded-full"
+                                >
+                                  {tag}
+                                </span>
                               ))}
                             </div>
                           )}
 
+                          {/* Mini Attached Card Banner in Feed Preview */}
+                          <div
+                            onClick={() => setActiveTab("card")}
+                            className="mt-2 p-3.5 rounded-[18px] bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-between cursor-pointer hover:border-[#0066cc]/40 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="size-10 rounded-xl flex items-center justify-center text-white shadow-sm"
+                                style={{ backgroundColor: customAccent }}
+                              >
+                                <ImageIcon className="size-5" />
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold text-[#1d1d1f] dark:text-white flex items-center gap-1.5">
+                                  <span>Tarjeta Visual 4:5 Adjunta (1080×1350)</span>
+                                  <span className="text-[10px] text-[#30d158] bg-[#30d158]/10 px-2 py-0.2 rounded-full font-mono">
+                                    Listo para Buffer
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-[#6e6e73] dark:text-[#86868b]">
+                                  {activeManifest.headline}
+                                </div>
+                              </div>
+                            </div>
+                            <span className="text-xs font-medium text-[#0066cc] dark:text-[#2997ff] flex items-center gap-1">
+                              <span>Personalizar</span>
+                              <ArrowUpRight className="size-3.5" />
+                            </span>
+                          </div>
+
+                          {/* Social Metrics Bar */}
+                          <div className="pt-3 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between text-xs text-[#6e6e73] dark:text-[#86868b]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-flex items-center justify-center size-4 rounded-full bg-[#0066cc] text-white text-[9px]">
+                                👍
+                              </span>
+                              <span className="inline-flex items-center justify-center size-4 rounded-full bg-[#ff375f] text-white text-[9px] -ml-1">
+                                ❤️
+                              </span>
+                              <span className="ml-1 text-[11px]">48 reacciones</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-[11px]">
+                              <span>12 comentarios</span>
+                              <span>•</span>
+                              <span>6 compartidos</span>
+                            </div>
+                          </div>
+
+                          {/* Social Actions Mock */}
+                          <div className="grid grid-cols-4 gap-1 pt-1 text-xs text-[#6e6e73] dark:text-[#86868b]">
+                            <button className="py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center gap-1.5 font-medium">
+                              <Heart className="size-3.5" />
+                              <span className="hidden sm:inline">Me gusta</span>
+                            </button>
+                            <button className="py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center gap-1.5 font-medium">
+                              <MessageSquare className="size-3.5" />
+                              <span className="hidden sm:inline">Comentar</span>
+                            </button>
+                            <button className="py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center gap-1.5 font-medium">
+                              <Repeat2 className="size-3.5" />
+                              <span className="hidden sm:inline">Compartir</span>
+                            </button>
+                            <button
+                              onClick={() => handlePublishToBuffer("addToQueue")}
+                              className="py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center gap-1.5 font-medium text-[#0066cc] dark:text-[#2997ff]"
+                            >
+                              <Send className="size-3.5" />
+                              <span>Buffer</span>
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -897,63 +1108,121 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* TAB 3: 4:5 Image Studio (Apple Pedestal) */}
+                  {/* TAB 3: 4:5 Image Studio (Adaptive Pedestal & Zoom) */}
                   {activeTab === "card" && (
                     <div className="mt-5 sm:mt-6 flex flex-col items-center gap-6">
-                      {/* Floating Apple Acrylic Palette Bar */}
-                      <div className="apple-acrylic-bar p-2 px-3 sm:px-4 flex flex-wrap items-center justify-between gap-3 w-full max-w-lg">
-                        {/* Accent Colors */}
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-medium text-[#6e6e73] dark:text-[#86868b]">
+                      {/* Floating Apple Acrylic Palette & Controls Bar */}
+                      <div className="apple-acrylic-bar p-3 px-4 sm:px-5 flex flex-wrap items-center justify-between gap-4 w-full">
+                        {/* Accent Colors Palette */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-semibold uppercase text-[#6e6e73] dark:text-[#86868b]">
                             Color:
                           </span>
-                          {["#0066cc", "#30d158", "#ff9f0a", "#bf5af2", "#ff375f"].map((c) => (
-                            <button
-                              key={c}
-                              onClick={() => setCustomAccent(c)}
-                              style={{ backgroundColor: c }}
-                              className={`size-4 sm:size-5 rounded-full transition-transform cursor-pointer ${
-                                customAccent === c ? "scale-125 ring-2 ring-white" : "hover:scale-110"
-                              }`}
-                            />
-                          ))}
+                          <div className="flex items-center gap-1.5">
+                            {[
+                              { color: "#0066cc", name: "Sapphire" },
+                              { color: "#30d158", name: "Emerald" },
+                              { color: "#ff9f0a", name: "Amber" },
+                              { color: "#bf5af2", name: "Violet" },
+                              { color: "#ff375f", name: "Crimson" },
+                              { color: "#00f2fe", name: "Cyan" },
+                            ].map((c) => (
+                              <button
+                                key={c.color}
+                                onClick={() => setCustomAccent(c.color)}
+                                style={{ backgroundColor: c.color }}
+                                title={c.name}
+                                className={`size-5 sm:size-6 rounded-full transition-transform cursor-pointer shadow-sm ${
+                                  customAccent === c.color ? "scale-125 ring-2 ring-white" : "hover:scale-110 opacity-80"
+                                }`}
+                              />
+                            ))}
+                          </div>
                         </div>
 
                         {/* Author name input */}
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-medium text-[#6e6e73] dark:text-[#86868b]">
-                            Autor:
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-semibold uppercase text-[#6e6e73] dark:text-[#86868b]">
+                            Firma:
                           </span>
                           <input
                             type="text"
                             value={customAuthor}
                             onChange={(e) => setCustomAuthor(e.target.value)}
-                            className="apple-input-capsule text-xs py-0.5 px-2.5 w-20 sm:w-24"
+                            className="apple-input-capsule text-xs py-1 px-3 w-24 sm:w-28 font-medium"
                           />
                         </div>
 
-                        {/* Download CTA */}
-                        <button
-                          onClick={handleDownloadPNG}
-                          disabled={isExporting}
-                          className="apple-btn-primary py-1.5 px-3.5 text-xs flex items-center gap-1.5 min-h-[34px]"
-                        >
-                          <Download className="size-3.5" />
-                          <span>{isExporting ? "Generando..." : "Descargar PNG"}</span>
-                        </button>
+                        {/* Zoom Controls */}
+                        <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 p-1 rounded-full text-xs">
+                          {[
+                            { label: "35%", val: 0.35 },
+                            { label: "45%", val: 0.45 },
+                            { label: "60%", val: 0.6 },
+                          ].map((z) => (
+                            <button
+                              key={z.label}
+                              onClick={() => setCardZoom(z.val)}
+                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono transition-colors ${
+                                cardZoom === z.val
+                                  ? "bg-white dark:bg-white/20 text-[#1d1d1f] dark:text-white font-semibold shadow-xs"
+                                  : "text-[#6e6e73] dark:text-[#86868b] hover:text-[#1d1d1f]"
+                              }`}
+                            >
+                              {z.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Export & Buffer Action Buttons */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleDownloadPNG}
+                            disabled={isExporting}
+                            className="apple-btn-secondary py-1.5 px-3.5 text-xs flex items-center gap-1.5 min-h-[36px]"
+                          >
+                            <Download className="size-3.5" />
+                            <span>{isExporting ? "Renderizando..." : "Descargar PNG"}</span>
+                          </button>
+                          <button
+                            onClick={() => handlePublishToBuffer("addToQueue", true)}
+                            disabled={isPublishingBuffer}
+                            className="apple-btn-primary py-1.5 px-4 text-xs flex items-center gap-1.5 min-h-[36px]"
+                          >
+                            <Share2 className="size-3.5" />
+                            <span>Publicar en Buffer</span>
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Card Preview on Apple Pedestal with Signature Drop-Shadow */}
-                      <div className="w-full p-2 sm:p-4 rounded-[24px] sm:rounded-[28px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center overflow-x-auto">
-                        <div className="apple-product-elevation rounded-[20px] sm:rounded-[24px] overflow-hidden my-2">
+                      {/* Responsive Card Preview Container on Pedestal */}
+                      <div className="w-full min-h-[580px] p-4 sm:p-8 rounded-[28px] bg-black/[0.03] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 flex items-center justify-center overflow-auto">
+                        <div
+                          style={{
+                            width: `${1080 * cardZoom}px`,
+                            height: `${1350 * cardZoom}px`,
+                          }}
+                          className="apple-product-elevation rounded-[24px] overflow-hidden relative shrink-0 transition-all duration-200"
+                        >
                           <SocialPostCard
                             manifest={activeManifest}
-                            scale={0.38}
+                            scale={cardZoom}
                           />
                         </div>
                       </div>
                     </div>
                   )}
+
+                  {/* Hidden Background SocialPostCard for Immediate Buffer Export from Any Tab */}
+                  {activeTab !== "card" && (
+                    <div className="hidden" aria-hidden="true">
+                      <SocialPostCard
+                        manifest={activeManifest}
+                        scale={1}
+                      />
+                    </div>
+                  )}
+
 
                   {/* TAB 4: Technical Evidence & Diff */}
                   {activeTab === "evidence" && (
