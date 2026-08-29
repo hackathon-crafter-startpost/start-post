@@ -7,7 +7,8 @@ import {
   createBufferPost,
   createBufferIdea,
   type BufferChannelData,
-} from "./bufferClient";
+} from "./lib/bufferClient";
+
 
 
 export const getSettings = query({

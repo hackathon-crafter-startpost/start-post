@@ -10,7 +10,6 @@
 
 import type * as assets from "../assets.js";
 import type * as buffer from "../buffer.js";
-import type * as bufferClient from "../bufferClient.js";
 import type * as demo from "../demo.js";
 import type * as events from "../events.js";
 import type * as feedback from "../feedback.js";
@@ -18,6 +17,7 @@ import type * as generation from "../generation.js";
 import type * as healthCheck from "../healthCheck.js";
 import type * as http from "../http.js";
 import type * as installations from "../installations.js";
+import type * as lib_bufferClient from "../lib/bufferClient.js";
 import type * as moments from "../moments.js";
 import type * as privateData from "../privateData.js";
 import type * as sessions from "../sessions.js";
@@ -31,7 +31,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   assets: typeof assets;
   buffer: typeof buffer;
-  bufferClient: typeof bufferClient;
   demo: typeof demo;
   events: typeof events;
   feedback: typeof feedback;
@@ -39,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   healthCheck: typeof healthCheck;
   http: typeof http;
   installations: typeof installations;
+  "lib/bufferClient": typeof lib_bufferClient;
   moments: typeof moments;
   privateData: typeof privateData;
   sessions: typeof sessions;

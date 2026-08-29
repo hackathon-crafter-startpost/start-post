@@ -6,7 +6,8 @@ import {
   createBufferIdea,
   deleteBufferPost,
   executeBufferGraphQL,
-} from "../convex/bufferClient";
+} from "../convex/lib/bufferClient";
+
 
 describe("Buffer GraphQL Client", () => {
   const mockApiKey = "buf_test_api_key_12345";
