@@ -215,37 +215,44 @@ export function generatePostDraftFromMoment(
   const author = options.authorName || "Desarrollador";
   const accent = options.accentColor || "#10b981";
 
-  const hook = `¿Te ha pasado que pasas horas depurando un bug y la causa era una configuración por defecto invisible? 🐛👇`;
+  const hook = `Hoy pasé casi una hora dudando de mis habilidades por un error que parecía imposible... hasta que entendí la causa raíz. 🐛👇`;
 
-  const body = `Hoy durante una sesión de desarrollo me topé con un problema interesante:
+  const body = `Hoy estuve programando y me topé con uno de esos momentos donde el síndrome del impostor te hace dudar de todo:
 
-🔴 El Problema:
+🔴 Lo que me estaba rompiendo la cabeza:
 ${moment.problem}
 
-🔍 Lo que descubrí:
+💭 Mi primer pensamiento (el impostor atacando):
+"Seguro esto es un fallo básico mío o me falta nivel para entender esta arquitectura..."
+
+🔍 Lo que realmente descubrí al depurar a fondo:
 ${moment.discovery}
 
-🟢 La Solución:
+🟢 La solución que implementé:
 ${moment.solution}
 
-💡 El Aprendizaje clave:
+💡 La lección que me guardo para siempre:
 ${moment.lesson}
 
-Comparte tu experiencia: ¿Has tenido un bug similar con APIs del navegador o librerías externas?`;
+✨ Recordatorio para quien lo necesite hoy:
+Atascarte en un bug, tardar tiempo en ver un detalle o dudar de ti mismo no te hace mal desarrollador. Es literalmente la forma en que todos construimos experiencia real.
+
+¿Cuál ha sido ese bug reciente que te hizo dudar de ti mismo antes de resolverlo? Te leo en los comentarios 👇`;
 
   const hashtags = [
+    "#LearnInPublic",
     "#SoftwareEngineering",
+    "#DeveloperLife",
+    "#ImposterSyndrome",
     "#WebDev",
     "#Coding",
-    "#LearnInPublic",
-    "#TypeScript",
     "#BuildSignal",
   ];
 
   const imageManifest: ImageManifest = {
     template: "bug-fix",
     headline: moment.title || "Bug resuelto: causa raíz y solución",
-    eyebrow: "APRENDIZAJE DE CÓDIGO REAL",
+    eyebrow: "APRENDIZAJE REAL EN CÓDIGO",
     problem: moment.problem,
     codeBefore: options.codeBefore,
     codeAfter: options.codeAfter,
@@ -261,9 +268,10 @@ Comparte tu experiencia: ¿Has tenido un bug similar con APIs del navegador o li
     hook,
     body,
     takeaway: moment.lesson,
-    cta: "¿Te ha sucedido algo similar? Te leo en comentarios 👇",
+    cta: "¿Cuál ha sido ese bug reciente que te hizo dudar de ti mismo antes de resolverlo? Te leo en los comentarios 👇",
     hashtags,
     imageManifest,
     status: "draft",
   };
+
 }

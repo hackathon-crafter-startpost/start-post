@@ -846,8 +846,9 @@ export default function DashboardPage() {
                       ) : (
                         <div className="p-4 sm:p-6 rounded-[18px] sm:rounded-[20px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/[0.06] text-[14px] sm:text-[15px] leading-relaxed flex flex-col gap-4 text-[#1d1d1f] dark:text-white">
                           <p className="font-semibold text-[#0066cc] dark:text-[#2997ff] text-[15px] sm:text-[16px]">
-                            {activeMoment.postDraft?.hook || "¿Te ha pasado esto al programar? 👇"}
+                            {activeMoment.postDraft?.hook || "Hoy casi dudo de mis habilidades por un bug... hasta que descubrí esto. 🐛👇"}
                           </p>
+
                           <div className="whitespace-pre-line text-[#3a3a3c] dark:text-[#d1d1d6] text-xs sm:text-sm leading-relaxed">
                             {activeMoment.postDraft?.body || activeMoment.problem}
                           </div>

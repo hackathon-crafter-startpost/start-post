@@ -126,36 +126,43 @@ export const analyzeSession = mutation({
 
     // 4. If score >= 70, create or update PostDraft
     if (momentId && score >= 70) {
-      const hook = `¿Te ha pasado que pasas horas depurando un bug y la causa era una configuración por defecto invisible? 🐛👇`;
-      const body = `Hoy durante una sesión de desarrollo me topé con un problema interesante:
+      const hook = `Hoy pasé casi una hora dudando de mis habilidades por un error que parecía imposible... hasta que entendí la causa raíz. 🐛👇`;
+      const body = `Hoy estuve programando y me topé con uno de esos momentos donde el síndrome del impostor te hace dudar de todo:
 
-🔴 El Problema:
+🔴 Lo que me estaba rompiendo la cabeza:
 ${problem}
 
-🔍 Lo que descubrí:
+💭 Mi primer pensamiento (el impostor atacando):
+"Seguro esto es un fallo básico mío o me falta nivel para entender esta arquitectura..."
+
+🔍 Lo que realmente descubrí al depurar a fondo:
 ${discovery}
 
-🟢 La Solución:
+🟢 La solución que implementé:
 ${solution}
 
-💡 El Aprendizaje clave:
+💡 La lección que me guardo para siempre:
 ${lesson}
 
-Comparte tu experiencia: ¿Has tenido un bug similar con APIs del navegador o librerías externas?`;
+✨ Recordatorio para quien lo necesite hoy:
+Atascarte en un bug, tardar tiempo en ver un detalle o dudar de ti mismo no te hace mal desarrollador. Es literalmente la forma en que todos construimos experiencia real.
+
+¿Cuál ha sido ese bug reciente que te hizo dudar de ti mismo antes de resolverlo? Te leo en los comentarios 👇`;
 
       const hashtags = [
+        "#LearnInPublic",
         "#SoftwareEngineering",
+        "#DeveloperLife",
+        "#ImposterSyndrome",
         "#WebDev",
         "#Coding",
-        "#LearnInPublic",
-        "#TypeScript",
         "#BuildSignal",
       ];
 
       const imageManifest = {
         template: "bug-fix",
         headline: title,
-        eyebrow: "LECCIÓN TÉCNICA",
+        eyebrow: "APRENDIZAJE REAL EN CÓDIGO",
         problem,
         codeBefore: codeBefore || "analyser.smoothingTimeConstant = 0.8;",
         codeAfter: codeAfter || "analyser.smoothingTimeConstant = 0.0;",
@@ -165,6 +172,7 @@ Comparte tu experiencia: ¿Has tenido un bug similar con APIs del navegador o li
         authorName: "Diego",
         category,
       };
+
 
       const existingDraft = await ctx.db
         .query("postDrafts")
@@ -389,8 +397,22 @@ export const analyzeWithGoogleGemini = action({
 
     const eventsSummary = events.map((e) => `[${e.type}]: ${e.summary || JSON.stringify(e.payload || {})}`).join("\n");
 
-    const promptText = `Eres el motor de observabilidad creativa y storytelling de ingeniería para BuildSignal.
-Analiza la siguiente sesión de programación con un agente de IA y genera una publicación de alto impacto educativo para LinkedIn/Twitter y la especificación de imagen 4:5.
+    const promptText = `Eres un mentor senior de ingeniería de software y narrador técnico que escribe historias en PRIMERA PERSONA ("yo", "hoy estuve...", "me pasó..."), profundamente humanas, empáticas y auténticas.
+
+OBJETIVO PRINCIPAL:
+Transformar esta sesión de código en una publicación de LinkedIn/Twitter escrita por el propio desarrollador en PRIMERA PERSONA, con un enfoque directo en COMBATIR EL SÍNDROME DEL IMPOSTOR y normalizar que incluso los errores aparentemente simples son parte natural del aprendizaje.
+
+REGLAS DE TONO Y ESTILO (OBLIGATORIAS):
+1. PRIMERA PERSONA SIEMPRE: Escribe desde el "yo" del programador ("Hoy pasé 40 minutos peleando con un error...", "La verdad es que dudé de mí...", "Lo que me estaba volviendo loco era..."). NUNCA uses tercera persona ni tono corporativo despersonalizado.
+2. ENFOQUE CONTRA EL SÍNDROME DEL IMPOSTOR: Muestra la vulnerabilidad de pensar que el error era por "falta de nivel" o "un fallo conceptual mío", para luego revelar que era un detalle sutil o una configuración oculta. Incluye un mensaje alentador de que atascarse no te hace mal desarrollador.
+3. ESTRUCTURA NARRATIVA HUMANA:
+   - Hook con vulnerabilidad y curiosidad técnica.
+   - Lo que me estaba rompiendo la cabeza (problema).
+   - Mi momento de duda / síndrome del impostor.
+   - Lo que realmente descubrí al depurar a fondo (causa raíz).
+   - Cómo lo resolví (solución técnica con código).
+   - El aprendizaje que me llevo y recordatorio empático para la comunidad.
+   - Pregunta de cierre cercana para abrir debate en comentarios.
 
 PROMPT DEL DESARROLLADOR:
 ${userPrompt || "Sesión de depuración y optimización de código"}
@@ -407,11 +429,11 @@ ${eventsSummary}
 Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura exacta:
 {
   "category": "bug_fix",
-  "title": "Título conciso del momento (máx 60 caracteres)",
-  "problem": "Descripción clara del problema técnico observado",
-  "discovery": "Causa raíz técnica descubierta durante la sesión",
-  "solution": "Solución concreta verificada con código",
-  "lesson": "Lección transferible y aplicable para otros ingenieros",
+  "title": "Título empático y técnico del momento (máx 60 caracteres)",
+  "problem": "Descripción del problema contado en primera persona",
+  "discovery": "La causa raíz real que descubrí al indagar a fondo",
+  "solution": "La solución concreta que implementé",
+  "lesson": "La lección técnica y humana que me llevo",
   "score": 88,
   "scoreBreakdown": {
     "problem": 22,
@@ -421,23 +443,24 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura exac
     "clarity": 13,
     "penalty": 0
   },
-  "hook": "Hook atractivo para LinkedIn con emoji que genere curiosidad técnica sin caer en clickbait",
-  "body": "Cuerpo del post estructurado con emojis y narrativa técnica impecable",
-  "hashtags": ["#SoftwareEngineering", "#WebDev", "#Coding", "#LearnInPublic", "#BuildSignal"],
+  "hook": "Hook magnético en primera persona (ej: 'Hoy pasé casi una hora sintiéndome el peor programador del mundo por un bug... hasta que entendí esto. 🐛👇')",
+  "body": "Texto completo del post en primera persona, estructurado con emojis y tono cercano, mostrando la duda inicial, la causa raíz real, la solución, el recordatorio contra el síndrome del impostor y el llamado a la comunidad.",
+  "hashtags": ["#LearnInPublic", "#SoftwareEngineering", "#DeveloperLife", "#ImposterSyndrome", "#Coding", "#BuildSignal"],
   "imageManifest": {
     "template": "bug-fix",
-    "headline": "Titular de alto impacto para la tarjeta visual",
-    "eyebrow": "LECCIÓN TÉCNICA",
+    "headline": "Titular empático o de impacto para la tarjeta visual",
+    "eyebrow": "APRENDIZAJE REAL EN CÓDIGO",
     "problem": "Problema resumido para la tarjeta",
     "codeBefore": "${codeBefore || "código previo"}",
     "codeAfter": "${codeAfter || "código corregido"}",
     "result": "Tests verificados: 100% aprobados",
-    "takeaway": "Frase de aprendizaje clave",
+    "takeaway": "Recordatorio inspirador o lección clave",
     "accentColor": "#0071e3",
     "authorName": "Diego",
     "category": "bug_fix"
   }
 }`;
+
 
     try {
       const response = await fetch(
