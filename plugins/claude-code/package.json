@@ -1,9 +1,10 @@
 {
   "name": "buildsignal-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "BuildSignal CLI & Agent Observer with Zero-Leak Local Privacy",
   "type": "module",
   "bin": {
+    "buildsignal-cli": "./bin/buildsignal.mjs",
     "buildsignal": "./bin/buildsignal.mjs",
     "buildsignal-hook": "./bin/buildsignal-hook.mjs"
   },
