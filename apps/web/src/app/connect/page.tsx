@@ -61,9 +61,9 @@ export default function ConnectAgentPage() {
     }
   };
 
-  const linkCommand = `npx buildsignal-cli link ${token}`;
-  const installCommand = `npx buildsignal-cli install`;
-  const simulateCommand = `npx buildsignal-cli simulate`;
+  const linkCommand = `npx buildsignal-cli@latest link ${token}`;
+  const installCommand = `npx buildsignal-cli@latest install`;
+  const simulateCommand = `npx buildsignal-cli@latest simulate`;
 
   const claudeManualConfig = JSON.stringify(
     {

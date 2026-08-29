@@ -33,8 +33,8 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
 
   if (!isOpen) return null;
 
-  const linkCommand = `npx buildsignal-cli link ${token}`;
-  const installCommand = `npx buildsignal-cli install`;
+  const linkCommand = `npx buildsignal-cli@latest link ${token}`;
+  const installCommand = `npx buildsignal-cli@latest install`;
 
   const claudeConfig = JSON.stringify(
     {
