@@ -19,19 +19,24 @@ import {
   RefreshCw,
   Sliders,
   Code2,
+  Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { SignInButton } from "@clerk/nextjs";
+import { BufferIntegrationModal } from "@/components/buffer-integration-modal";
 
 export default function ConnectAgentPage() {
   const [token, setToken] = useState<string>("bs_tok_local_demo_key");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<"claude" | "codex">("claude");
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
+  const [isBufferModalOpen, setIsBufferModalOpen] = useState(false);
 
   const getOrCreateToken = useMutation(api.installations.getUserInstallationToken);
   const devices = useQuery(api.installations.listUserDevices);
+  const bufferSettings = useQuery(api.buffer.getSettings, {});
+
 
   useEffect(() => {
     async function loadToken() {
@@ -328,7 +333,7 @@ export default function ConnectAgentPage() {
 
               <div className="flex flex-col gap-3">
                 {devices && devices.length > 0 ? (
-                  devices.map((d) => (
+                  devices.map((d: any) => (
                     <div
                       key={d._id}
                       className="p-4 rounded-[16px] bg-black/[0.02] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between"
@@ -414,6 +419,48 @@ export default function ConnectAgentPage() {
               </div>
             </div>
 
+            {/* Buffer Social Auto-Publishing Integration Card */}
+            <div className="apple-acrylic-card p-6 sm:p-8 border border-[#0066cc]/20 bg-[#0066cc]/[0.03]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-[#0066cc]/10 text-[#0066cc] dark:text-[#2997ff] shrink-0">
+                    <Share2 className="size-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-[16px] text-[#1d1d1f] dark:text-white">
+                        Publicación Automática con Buffer
+                      </h3>
+                      {bufferSettings?.apiKey && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#30d158]/10 text-[#30d158] font-mono border border-[#30d158]/20">
+                          Activo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#6e6e73] dark:text-[#86868b] mt-1.5 leading-relaxed">
+                      Conecta Buffer mediante GraphQL API para enviar automáticamente las publicaciones y tarjetas educativas a tu cola de LinkedIn, Twitter/X y redes sociales.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+                <span className="text-xs font-mono text-[#6e6e73] dark:text-[#86868b]">
+                  {bufferSettings?.apiKey
+                    ? `Canal: ${bufferSettings.channelName || "Configurado"}`
+                    : "No configurado"}
+                </span>
+
+                <button
+                  onClick={() => setIsBufferModalOpen(true)}
+                  className="apple-btn-secondary text-xs py-1.5 px-3.5 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Share2 className="size-3 text-[#0066cc] dark:text-[#2997ff]" />
+                  <span>{bufferSettings?.apiKey ? "Gestionar Buffer" : "Conectar Buffer"}</span>
+                </button>
+              </div>
+            </div>
+
             {/* Studio Navigation CTA */}
             <div className="apple-acrylic-card p-6 flex items-center justify-between">
               <div>
@@ -432,6 +479,13 @@ export default function ConnectAgentPage() {
           </div>
         </div>
       </main>
+
+      {/* Buffer Integration Modal */}
+      <BufferIntegrationModal
+        isOpen={isBufferModalOpen}
+        onClose={() => setIsBufferModalOpen(false)}
+      />
     </div>
   );
 }
+

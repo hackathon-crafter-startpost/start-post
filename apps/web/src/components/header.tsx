@@ -3,15 +3,19 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useMutation, Authenticated, Unauthenticated } from "convex/react";
+import { useQuery, Authenticated, Unauthenticated } from "convex/react";
 import { api } from "@hackathon-craft-station/backend/convex/_generated/api";
 import { CliSetupModal } from "./cli-setup-modal";
-import { Terminal, Activity, ShieldCheck, Play, Sparkles } from "lucide-react";
-import { toast } from "sonner";
+import { BufferIntegrationModal } from "./buffer-integration-modal";
+import { Terminal, Activity, ShieldCheck, Share2, Check, Zap } from "lucide-react";
 import { UserButton, SignInButton } from "@clerk/nextjs";
 
 export default function Header() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBufferModalOpen, setIsBufferModalOpen] = useState(false);
+  const bufferSettings = useQuery(api.buffer.getSettings, {});
+
+  const isBufferConnected = Boolean(bufferSettings?.apiKey);
 
   return (
     <>
@@ -41,6 +45,18 @@ export default function Header() {
               <Activity className="size-3 text-[#2997ff]" />
               <span>Telemetría en Vivo</span>
             </Link>
+            <button
+              onClick={() => setIsBufferModalOpen(true)}
+              className="hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Share2 className="size-3 text-[#2997ff]" />
+              <span>Buffer</span>
+              {isBufferConnected ? (
+                <span className="size-1.5 rounded-full bg-[#30d158]" />
+              ) : (
+                <span className="text-[10px] text-[#86868b]">(Configurar)</span>
+              )}
+            </button>
             <span className="text-[#7a7a7a] flex items-center gap-1">
               <ShieldCheck className="size-3 text-[#30d158]" />
               <span>Zero-Leak Local</span>
@@ -48,7 +64,15 @@ export default function Header() {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsBufferModalOpen(true)}
+              className="inline-flex md:hidden items-center gap-1 text-[#d2d2d7] hover:text-white transition-colors cursor-pointer"
+            >
+              <Share2 className="size-3 text-[#2997ff]" />
+              <span>Buffer</span>
+            </button>
+
             <button
               onClick={() => setIsModalOpen(true)}
               className="inline-flex items-center gap-1 text-[#d2d2d7] hover:text-white transition-colors cursor-pointer"
@@ -85,7 +109,15 @@ export default function Header() {
           </div>
 
           {/* Sub-nav Primary Pill Action CTA */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setIsBufferModalOpen(true)}
+              className="apple-btn-secondary py-1.5 px-3 text-[13px] sm:text-[14px] flex items-center gap-1.5 cursor-pointer"
+            >
+              <Share2 className="size-3.5 text-[#0066cc] dark:text-[#2997ff]" />
+              <span>{isBufferConnected ? "Buffer Conectado" : "Conectar Buffer"}</span>
+            </button>
+
             <button
               onClick={() => setIsModalOpen(true)}
               className="apple-btn-primary py-1.5 px-4 text-[13px] sm:text-[14px] flex items-center gap-2 cursor-pointer"
@@ -99,6 +131,13 @@ export default function Header() {
 
       {/* CLI Setup Modal */}
       <CliSetupModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
+      {/* Buffer Integration Modal */}
+      <BufferIntegrationModal
+        isOpen={isBufferModalOpen}
+        onClose={() => setIsBufferModalOpen(false)}
+      />
     </>
   );
 }
+

@@ -193,6 +193,13 @@ Comparte tu experiencia: ¿Has tenido un bug similar con APIs del navegador o li
           updatedAt: Date.now(),
         });
       }
+
+      // Trigger automatic Buffer publish if enabled
+      try {
+        await ctx.scheduler.runAfter(0, api.buffer.autoPublishIfEnabled, {
+          momentId,
+        });
+      } catch {}
     }
 
     return {
@@ -202,6 +209,7 @@ Comparte tu experiencia: ¿Has tenido un bug similar con APIs del navegador o li
     };
   },
 });
+
 
 export const updatePostDraft = mutation({
   args: {
@@ -316,11 +324,21 @@ export const saveAiGeneratedMoment = mutation({
           updatedAt: Date.now(),
         });
       }
+
+      // Trigger automatic Buffer publish if enabled
+      if (args.score >= 70) {
+        try {
+          await ctx.scheduler.runAfter(0, api.buffer.autoPublishIfEnabled, {
+            momentId,
+          });
+        } catch {}
+      }
     }
 
     return { success: true, momentId };
   },
 });
+
 
 export const analyzeWithGoogleGemini = action({
   args: {

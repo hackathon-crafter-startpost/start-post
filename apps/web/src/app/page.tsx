@@ -8,6 +8,7 @@ import { SocialPostCard, HyperFramesPlayer } from "@hackathon-craft-station/imag
 import type { ImageManifest } from "@hackathon-craft-station/shared-types";
 import { toBlob } from "html-to-image";
 import { toast } from "sonner";
+import { BufferIntegrationModal } from "@/components/buffer-integration-modal";
 import {
   Copy,
   Download,
@@ -32,11 +33,16 @@ import {
   SlidersHorizontal,
   Sparkles,
   Play,
+  Share2,
+  Send,
+  Clock3,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardPage() {
   const moments = useQuery(api.moments.list, { limit: 50 });
+  const bufferSettings = useQuery(api.buffer.getSettings, {});
   const [selectedMomentId, setSelectedMomentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"post" | "video" | "card" | "evidence">("post");
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,6 +53,11 @@ export default function DashboardPage() {
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editedHook, setEditedHook] = useState("");
   const [editedBody, setEditedBody] = useState("");
+
+  // Buffer integration state
+  const [isBufferModalOpen, setIsBufferModalOpen] = useState(false);
+  const [isPublishingBuffer, setIsPublishingBuffer] = useState(false);
+  const [showBufferMenu, setShowBufferMenu] = useState(false);
 
   // Visual card customizer state (Apple HIG Palette)
   const [customAuthor, setCustomAuthor] = useState("Diego");
@@ -61,6 +72,9 @@ export default function DashboardPage() {
   const registerFeedback = useMutation(api.feedback.register);
   const updatePostDraft = useMutation(api.generation.updatePostDraft);
   const analyzeWithGemini = useAction(api.generation.analyzeWithGoogleGemini);
+  const publishToBuffer = useAction(api.buffer.publishPost);
+  const createBufferIdea = useAction(api.buffer.createIdea);
+
 
   const handleGenerateWithGemini = async () => {
     if (!activeMoment?.sessionId) return;
@@ -84,7 +98,7 @@ export default function DashboardPage() {
   // Filter moments
   const filteredMoments = useMemo(() => {
     if (!moments) return [];
-    return moments.filter((m) => {
+    return moments.filter((m: any) => {
       const matchesCategory =
         selectedCategory === "all" || m.category === selectedCategory;
       const matchesSearch =
@@ -98,9 +112,10 @@ export default function DashboardPage() {
 
   // Pick active moment or first available
   const activeMoment =
-    filteredMoments.find((m) => m._id === selectedMomentId) ||
+    filteredMoments.find((m: any) => m._id === selectedMomentId) ||
     filteredMoments[0] ||
     moments?.[0];
+
 
   const handleSelectMoment = (id: string) => {
     setSelectedMomentId(id);
@@ -232,6 +247,61 @@ export default function DashboardPage() {
     }
   };
 
+  const handlePublishToBuffer = async (mode: "addToQueue" | "now" | "idea") => {
+    if (!activeMoment?._id) return;
+    if (!bufferSettings?.apiKey || !bufferSettings?.channelId) {
+      toast.info("Configura tu cuenta de Buffer primero para publicar automáticamente.");
+      setIsBufferModalOpen(true);
+      return;
+    }
+
+    try {
+      setIsPublishingBuffer(true);
+      setShowBufferMenu(false);
+
+      if (mode === "idea") {
+        toast.info("Creando Idea en Buffer...");
+        const res = await createBufferIdea({
+          momentId: activeMoment._id,
+        });
+        if (res.success) {
+          toast.success("¡Idea creada en Buffer!", {
+            description: "Añadida a tu banco de ideas en Buffer.",
+          });
+        } else {
+          toast.error(res.error || "Error al crear la idea en Buffer");
+        }
+      } else {
+        toast.info(
+          mode === "now"
+            ? "Publicando directamente a Buffer..."
+            : "Añadiendo a la cola de Buffer..."
+        );
+        const res = await publishToBuffer({
+          momentId: activeMoment._id,
+          postDraftId: activeMoment.postDraft?._id,
+          modeOverride: mode,
+        });
+        if (res.success) {
+          toast.success(
+            mode === "now"
+              ? "¡Publicado en Buffer exitosamente!"
+              : "¡Añadido a la cola de Buffer con éxito!",
+            {
+              description: `Canal: ${res.channelName || bufferSettings.channelName || "Canal configurado"}.`,
+            }
+          );
+        } else {
+          toast.error(res.error || "Error al publicar en Buffer");
+        }
+      }
+    } catch (err: any) {
+      toast.error("Error al conectar con Buffer: " + (err?.message || ""));
+    } finally {
+      setIsPublishingBuffer(false);
+    }
+  };
+
   // Merged image manifest
   const activeManifest: ImageManifest = {
     template: customTemplate,
@@ -256,7 +326,7 @@ export default function DashboardPage() {
             {/* Apple Frosted Pill Eyebrow */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full apple-acrylic-bar text-[12px] font-medium text-[#0066cc] dark:text-[#2997ff] mb-4 shadow-sm">
               <span className="size-2 rounded-full bg-[#30d158] animate-pulse" />
-              <span>Observabilidad Creativa • HyperFrames & Gemini 2.5 AI</span>
+              <span>Observabilidad Creativa • HyperFrames, Gemini 2.5 & Buffer API</span>
             </div>
 
             {/* SF Pro Display Hero Headline (Apple 56px tight tracking) */}
@@ -265,7 +335,7 @@ export default function DashboardPage() {
             </h1>
 
             <p className="text-[15px] sm:text-[17px] text-[#6e6e73] dark:text-[#86868b] mt-3.5 leading-relaxed font-normal">
-              Captura pasiva con Claude Code y Codex. Detección determinista de valor educativo, síntesis narrativa con Google Gemini y generación de video interactivo con HyperFrames.
+              Captura pasiva con Claude Code y Codex. Detección determinista de valor educativo, síntesis narrativa con Google Gemini, video HyperFrames y auto-publicación a Buffer.
             </p>
 
             {/* Top Action Pills */}
@@ -277,10 +347,28 @@ export default function DashboardPage() {
                 <Activity className="size-3.5 text-[#0066cc] dark:text-[#2997ff]" />
                 <span>Telemetría en Vivo</span>
               </Link>
+
+              <button
+                onClick={() => setIsBufferModalOpen(true)}
+                className="apple-btn-secondary text-[14px] flex items-center gap-2 cursor-pointer"
+              >
+                <Share2 className="size-3.5 text-[#0066cc] dark:text-[#2997ff]" />
+                <span>
+                  {bufferSettings?.apiKey
+                    ? `Buffer: ${bufferSettings.channelName || "Conectado"}`
+                    : "Integrar Buffer"}
+                </span>
+                {bufferSettings?.autoPublish && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#30d158]/15 text-[#30d158] font-mono">
+                    Auto
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         </div>
       </section>
+
 
       {/* Main Studio Container */}
       <main className="container mx-auto px-4 sm:px-8 pt-8 sm:pt-10">
@@ -423,9 +511,10 @@ export default function DashboardPage() {
 
               {/* Moments List */}
               <div className="flex flex-col gap-3.5 max-h-[750px] overflow-y-auto pr-1">
-                {filteredMoments.map((m) => {
+                {filteredMoments.map((m: any) => {
                   const isSelected = activeMoment?._id === m._id;
                   const isHighValue = m.score >= 70;
+
 
                   return (
                     <div
@@ -575,9 +664,31 @@ export default function DashboardPage() {
                     <div className="mt-5 sm:mt-6 flex flex-col gap-4">
                       {/* Action Bar */}
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="text-[13px] sm:text-[14px] font-semibold text-[#1d1d1f] dark:text-white">
-                          Historia Optimizada para Redes
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] sm:text-[14px] font-semibold text-[#1d1d1f] dark:text-white">
+                            Historia Optimizada para Redes
+                          </span>
+                          {activeMoment.postDraft?.bufferStatus && (
+                            <span
+                              className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                                activeMoment.postDraft.bufferStatus === "queued"
+                                  ? "bg-[#0066cc]/10 text-[#0066cc] dark:text-[#2997ff] border border-[#0066cc]/20"
+                                  : activeMoment.postDraft.bufferStatus === "published"
+                                  ? "bg-[#30d158]/10 text-[#30d158] border border-[#30d158]/20"
+                                  : "bg-[#ff453a]/10 text-[#ff453a] border border-[#ff453a]/20"
+                              }`}
+                            >
+                              <Share2 className="size-2.5" />
+                              <span>
+                                {activeMoment.postDraft.bufferStatus === "queued"
+                                  ? "En Cola de Buffer"
+                                  : activeMoment.postDraft.bufferStatus === "published"
+                                  ? "Publicado en Buffer"
+                                  : "Buffer Error"}
+                              </span>
+                            </span>
+                          )}
+                        </div>
 
                         <div className="flex items-center gap-2 flex-wrap">
                           {isEditingPost ? (
@@ -614,6 +725,75 @@ export default function DashboardPage() {
                                 <Edit3 className="size-3.5 mr-1" />
                                 <span>Editar</span>
                               </button>
+
+                              {/* Buffer Quick Publish Menu */}
+                              <div className="relative">
+                                <div className="inline-flex rounded-full overflow-hidden shadow-sm">
+                                  <button
+                                    onClick={() => handlePublishToBuffer("addToQueue")}
+                                    disabled={isPublishingBuffer}
+                                    className="apple-btn-secondary text-[12px] sm:text-[13px] py-1.5 px-3 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[36px] rounded-r-none border-r-0"
+                                    title={`Publicar en Buffer (${bufferSettings?.channelName || "Configurar"})`}
+                                  >
+                                    <Share2 className={`size-3.5 text-[#0066cc] dark:text-[#2997ff] ${isPublishingBuffer ? "animate-spin" : ""}`} />
+                                    <span>{isPublishingBuffer ? "Enviando..." : "Buffer"}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setShowBufferMenu((v) => !v)}
+                                    disabled={isPublishingBuffer}
+                                    className="apple-btn-secondary px-2 py-1.5 text-xs flex items-center justify-center cursor-pointer rounded-l-none min-h-[36px]"
+                                  >
+                                    <ChevronDown className="size-3" />
+                                  </button>
+                                </div>
+
+                                {showBufferMenu && (
+                                  <div className="absolute right-0 top-full mt-2 w-56 p-1.5 rounded-[18px] apple-acrylic-card border border-black/10 dark:border-white/15 shadow-xl z-30 flex flex-col gap-1 text-xs">
+                                    <button
+                                      onClick={() => handlePublishToBuffer("addToQueue")}
+                                      className="w-full text-left px-3 py-2 rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-between text-[#1d1d1f] dark:text-white cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <Clock3 className="size-3.5 text-[#0066cc] dark:text-[#2997ff]" />
+                                        <span>Añadir a la Cola</span>
+                                      </span>
+                                      <span className="text-[10px] text-[#86868b] font-mono">Queue</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handlePublishToBuffer("now")}
+                                      className="w-full text-left px-3 py-2 rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-between text-[#1d1d1f] dark:text-white cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <Send className="size-3.5 text-[#30d158]" />
+                                        <span>Publicar Ahora</span>
+                                      </span>
+                                      <span className="text-[10px] text-[#86868b] font-mono">Now</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handlePublishToBuffer("idea")}
+                                      className="w-full text-left px-3 py-2 rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-between text-[#1d1d1f] dark:text-white cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <Sparkles className="size-3.5 text-[#ff9f0a]" />
+                                        <span>Guardar como Idea</span>
+                                      </span>
+                                      <span className="text-[10px] text-[#86868b] font-mono">Idea</span>
+                                    </button>
+                                    <div className="h-px bg-black/5 dark:bg-white/10 my-0.5" />
+                                    <button
+                                      onClick={() => {
+                                        setShowBufferMenu(false);
+                                        setIsBufferModalOpen(true);
+                                      }}
+                                      className="w-full text-left px-3 py-2 rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2 text-[#0066cc] dark:text-[#2997ff] cursor-pointer"
+                                    >
+                                      <SlidersHorizontal className="size-3.5" />
+                                      <span>Configurar Buffer</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
                               <button
                                 onClick={handleCopyPost}
                                 className="apple-btn-primary text-[12px] sm:text-[13px] py-1.5 px-4 min-h-[36px]"
@@ -634,6 +814,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                       </div>
+
 
                       {/* Post Content Box */}
                       {isEditingPost ? (
@@ -671,11 +852,12 @@ export default function DashboardPage() {
                           </div>
                           {activeMoment.postDraft?.hashtags && (
                             <div className="flex flex-wrap gap-1.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] text-[11px] sm:text-xs font-mono text-[#0066cc] dark:text-[#2997ff]">
-                              {activeMoment.postDraft.hashtags.map((tag, i) => (
+                              {activeMoment.postDraft.hashtags.map((tag: string, i: number) => (
                                 <span key={i}>{tag}</span>
                               ))}
                             </div>
                           )}
+
                         </div>
                       )}
                     </div>
@@ -827,6 +1009,13 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* Buffer Integration Modal */}
+      <BufferIntegrationModal
+        isOpen={isBufferModalOpen}
+        onClose={() => setIsBufferModalOpen(false)}
+      />
     </div>
   );
 }
+

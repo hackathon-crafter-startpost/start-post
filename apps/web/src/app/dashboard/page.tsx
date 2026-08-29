@@ -23,8 +23,9 @@ export default function DashboardSessionsPage() {
   const filteredEvents = React.useMemo(() => {
     if (!events) return [];
     if (filterType === "all") return events;
-    return events.filter((e) => e.type === filterType);
+    return events.filter((e: any) => e.type === filterType);
   }, [events, filterType]);
+
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] dark:bg-[#000000] text-[#1d1d1f] dark:text-[#f5f5f7] pb-32 transition-colors duration-300">
@@ -75,7 +76,7 @@ export default function DashboardSessionsPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-3 max-h-[720px] overflow-y-auto pr-1">
-                {sessions.map((s) => {
+                {sessions.map((s: any) => {
                   const sessionIdentifier = s.sessionId || (s._id as string);
                   const isSelected = activeSessionId === sessionIdentifier;
                   return (
@@ -159,10 +160,11 @@ export default function DashboardSessionsPage() {
                   No hay eventos capturados para el filtro seleccionado.
                 </div>
               ) : (
-                filteredEvents.map((evt) => {
+                filteredEvents.map((evt: any) => {
                   const isFailure = evt.type === "test_failed";
                   const isSuccess = evt.type === "test_passed";
                   const isFile = evt.type === "file_changed";
+
 
                   return (
                     <div

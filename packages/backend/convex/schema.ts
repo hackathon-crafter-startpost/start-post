@@ -112,7 +112,10 @@ export default defineSchema({
       authorName: v.optional(v.string()),
       category: v.optional(v.string()),
     }),
-    status: v.string(), // "draft" | "edited" | "ready"
+    status: v.string(), // "draft" | "edited" | "ready" | "published"
+    bufferStatus: v.optional(v.string()), // "queued" | "published" | "failed"
+    bufferPostId: v.optional(v.string()),
+    bufferPublishedAt: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_moment", ["momentId"]),
 
@@ -131,4 +134,38 @@ export default defineSchema({
     editedFields: v.optional(v.array(v.string())),
     createdAt: v.number(),
   }).index("by_moment", ["momentId"]),
+
+  bufferSettings: defineTable({
+    userId: v.optional(v.string()),
+    apiKey: v.string(),
+    organizationId: v.optional(v.string()),
+    organizationName: v.optional(v.string()),
+    channelId: v.optional(v.string()),
+    channelName: v.optional(v.string()),
+    channelService: v.optional(v.string()),
+    channelAvatar: v.optional(v.string()),
+    autoPublish: v.boolean(),
+    publishMode: v.string(), // "addToQueue" | "now" | "next" | "customScheduled"
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  bufferPublications: defineTable({
+    momentId: v.id("moments"),
+    postDraftId: v.optional(v.id("postDrafts")),
+    bufferPostId: v.optional(v.string()),
+    bufferIdeaId: v.optional(v.string()),
+    channelId: v.optional(v.string()),
+    channelName: v.optional(v.string()),
+    channelService: v.optional(v.string()),
+    status: v.string(), // "scheduled" | "published" | "idea_created" | "failed"
+    mode: v.string(),
+    text: v.string(),
+    imageUrl: v.optional(v.string()),
+    dueAt: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_moment", ["momentId"])
+    .index("by_post_draft", ["postDraftId"]),
 });
+
