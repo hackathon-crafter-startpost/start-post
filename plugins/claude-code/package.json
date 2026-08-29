@@ -1,0 +1,15 @@
+{
+  "name": "@hackathon-craft-station/plugin-claude-code",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "buildsignal": "./bin/buildsignal.mjs",
+    "buildsignal-hook": "./bin/buildsignal-hook.mjs"
+  },
+  "dependencies": {
+    "@hackathon-craft-station/collector": "workspace:*",
+    "@hackathon-craft-station/sanitizer": "workspace:*",
+    "@hackathon-craft-station/shared-types": "workspace:*"
+  }
+}

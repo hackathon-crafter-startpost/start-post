@@ -1,0 +1,379 @@
+import fs from "fs";
+import path from "path";
+import os from "os";
+import type {
+  SessionEvent,
+  EventSource,
+  EventType,
+  EventBatch,
+} from "@hackathon-craft-station/shared-types";
+import { sanitizeEvent } from "@hackathon-craft-station/sanitizer";
+
+/**
+ * Generates an idempotent, timestamped event ID.
+ */
+export function generateEventId(): string {
+  const rand = Math.random().toString(36).substring(2, 10);
+  return `evt_${Date.now()}_${rand}`;
+}
+
+/**
+ * Safely reads JSON or string data from stdin with a timeout to avoid blocking parent agents.
+ */
+export async function readStdin(timeoutMs = 150): Promise<string> {
+  return new Promise((resolve) => {
+    let data = "";
+    const timer = setTimeout(() => resolve(data), timeoutMs);
+
+    if (process.stdin.isTTY) {
+      clearTimeout(timer);
+      return resolve("");
+    }
+
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => {
+      data += chunk;
+    });
+    process.stdin.on("end", () => {
+      clearTimeout(timer);
+      resolve(data);
+    });
+    process.stdin.on("error", () => {
+      clearTimeout(timer);
+      resolve(data);
+    });
+  });
+}
+
+export interface CreateEventOptions {
+  sessionId: string;
+  installationId: string;
+  source: EventSource;
+  type: EventType;
+  payload: Record<string, unknown>;
+  summary?: string;
+}
+
+/**
+ * Creates and automatically sanitizes a SessionEvent.
+ */
+export function createEvent(options: CreateEventOptions): SessionEvent {
+  const rawEvent: SessionEvent = {
+    eventId: generateEventId(),
+    sessionId: options.sessionId,
+    installationId: options.installationId,
+    source: options.source,
+    type: options.type,
+    timestamp: Date.now(),
+    payload: options.payload,
+    summary: options.summary,
+    sanitized: false,
+  };
+
+  return sanitizeEvent(rawEvent);
+}
+
+/**
+ * Normalizes Claude Code CLI hook messages into standard SessionEvents.
+ */
+export function normalizeClaudeEvent(
+  raw: Record<string, any>,
+  installationId: string
+): SessionEvent {
+  const sessionId = raw.session_id || raw.conversation_id || "claude-session-default";
+  let eventType: EventType = "turn_stopped";
+  let payload: Record<string, unknown> = {};
+
+  if (raw.type === "user_message" || raw.type === "prompt" || raw.user_prompt) {
+    eventType = "user_prompt";
+    payload = {
+      prompt: raw.message || raw.user_prompt || raw.prompt || "",
+    };
+  } else if (raw.type === "tool_use" || raw.type === "tool_result") {
+    const tool = raw.tool || raw.name || "";
+    const command = raw.input?.command || raw.command || "";
+    const output = raw.output || raw.result || "";
+    const exitCode = raw.exit_code ?? (raw.error ? 1 : 0);
+
+    // Detect test execution
+    if (command.includes("test") || command.includes("vitest") || command.includes("jest")) {
+      eventType = exitCode === 0 ? "test_passed" : "test_failed";
+    } else if (tool === "Edit" || tool === "Write" || tool === "replace_file_content") {
+      eventType = "file_changed";
+    } else {
+      eventType = "tool_result";
+    }
+
+    payload = {
+      tool,
+      command,
+      output,
+      exitCode,
+      filePath: raw.input?.file_path || raw.file_path || raw.filePath,
+    };
+  } else if (raw.type === "session_started") {
+    eventType = "session_started";
+    payload = { ...raw };
+  } else if (raw.type === "session_ended") {
+    eventType = "session_ended";
+    payload = { ...raw };
+  } else {
+    payload = { ...raw };
+  }
+
+  return createEvent({
+    sessionId,
+    installationId,
+    source: "claude-code",
+    type: eventType,
+    payload,
+    summary: raw.summary,
+  });
+}
+
+/**
+ * Normalizes Codex CLI hook messages into standard SessionEvents.
+ */
+export function normalizeCodexEvent(
+  raw: Record<string, any>,
+  installationId: string
+): SessionEvent {
+  const sessionId = raw.conversation_id || raw.session_id || "codex-session-default";
+  let eventType: EventType = "tool_result";
+  let payload: Record<string, unknown> = {};
+
+  if (raw.event_type === "prompt" || raw.type === "prompt") {
+    eventType = "user_prompt";
+    payload = {
+      prompt: raw.user_input || raw.prompt || "",
+    };
+  } else if (raw.event_type === "file_change") {
+    eventType = "file_changed";
+    payload = {
+      filePath: raw.file_path,
+      diff: raw.diff,
+    };
+  } else if (raw.event_type === "command_result") {
+    const cmd = raw.command || "";
+    const exitCode = raw.exit_code ?? 0;
+    if (cmd.includes("test")) {
+      eventType = exitCode === 0 ? "test_passed" : "test_failed";
+    } else {
+      eventType = "tool_result";
+    }
+    payload = { ...raw };
+  } else {
+    payload = { ...raw };
+  }
+
+  return createEvent({
+    sessionId,
+    installationId,
+    source: "codex",
+    type: eventType,
+    payload,
+    summary: raw.summary,
+  });
+}
+
+/**
+ * Local resilient queue for storing events before sending to Convex.
+ */
+export class EventQueue {
+  private memoryQueue: SessionEvent[] = [];
+  private filePath?: string;
+
+  constructor(storagePath?: string) {
+    if (storagePath === ":memory:") {
+      this.filePath = undefined;
+    } else {
+      const dir = storagePath || path.join(os.homedir(), ".buildsignal");
+      if (!fs.existsSync(dir)) {
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+        } catch {
+          // Fallback to memory if homedir not writable
+        }
+      }
+      this.filePath = path.join(dir, "queue.jsonl");
+    }
+  }
+
+  async enqueue(event: SessionEvent): Promise<void> {
+    if (!this.filePath) {
+      this.memoryQueue.push(event);
+      return;
+    }
+
+    try {
+      const line = JSON.stringify(event) + "\n";
+      fs.appendFileSync(this.filePath, line, "utf8");
+    } catch {
+      this.memoryQueue.push(event);
+    }
+  }
+
+  async peekBatch(limit: number = 20): Promise<SessionEvent[]> {
+    if (!this.filePath) {
+      return this.memoryQueue.slice(0, limit);
+    }
+
+    try {
+      if (!fs.existsSync(this.filePath)) return [];
+      const content = fs.readFileSync(this.filePath, "utf8");
+      const lines = content.split("\n").filter((l) => l.trim().length > 0);
+      const events: SessionEvent[] = [];
+      for (let i = 0; i < Math.min(lines.length, limit); i++) {
+        try {
+          events.push(JSON.parse(lines[i]));
+        } catch {
+          // ignore corrupted line
+        }
+      }
+      return events;
+    } catch {
+      return this.memoryQueue.slice(0, limit);
+    }
+  }
+
+  async acknowledge(eventIds: string[]): Promise<void> {
+    const idSet = new Set(eventIds);
+    if (!this.filePath) {
+      this.memoryQueue = this.memoryQueue.filter((e) => !idSet.has(e.eventId));
+      return;
+    }
+
+    try {
+      if (!fs.existsSync(this.filePath)) return;
+      const content = fs.readFileSync(this.filePath, "utf8");
+      const lines = content.split("\n").filter((l) => l.trim().length > 0);
+      const remaining: string[] = [];
+
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (!idSet.has(parsed.eventId)) {
+            remaining.push(line);
+          }
+        } catch {
+          // ignore corrupted line
+        }
+      }
+
+      fs.writeFileSync(
+        this.filePath,
+        remaining.length > 0 ? remaining.join("\n") + "\n" : "",
+        "utf8"
+      );
+    } catch {
+      this.memoryQueue = this.memoryQueue.filter((e) => !idSet.has(e.eventId));
+    }
+  }
+}
+
+export interface SendEventBatchOptions {
+  endpointUrl: string;
+  installationId: string;
+  sessionId: string;
+  source: EventSource;
+  events: SessionEvent[];
+}
+
+export interface SendEventBatchResult {
+  success: boolean;
+  ingestedCount: number;
+  error?: string;
+}
+
+/**
+ * Sends a batch of sanitized SessionEvents to the Convex HTTP Action ingest endpoint.
+ */
+export async function sendEventBatch(
+  options: SendEventBatchOptions
+): Promise<SendEventBatchResult> {
+  const payload: EventBatch = {
+    installationId: options.installationId,
+    sessionId: options.sessionId,
+    source: options.source,
+    events: options.events,
+  };
+
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    try {
+      attempts++;
+      const response = await fetch(options.endpointUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-buildsignal-installation": options.installationId,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+
+      const data = (await response.json()) as { success?: boolean; ingested?: number };
+      return {
+        success: data.success ?? true,
+        ingestedCount: data.ingested ?? options.events.length,
+      };
+    } catch (err: any) {
+      if (attempts >= maxAttempts) {
+        return {
+          success: false,
+          ingestedCount: 0,
+          error: err?.message || "Failed to send batch",
+        };
+      }
+      // Exponential backoff wait (50ms, 100ms...)
+      await new Promise((r) => setTimeout(r, attempts * 50));
+    }
+  }
+
+  return {
+    success: false,
+    ingestedCount: 0,
+    error: "Max attempts exceeded",
+  };
+}
+
+/**
+ * Flushes all queued events from local storage to the Convex endpoint.
+ */
+export async function flushQueue(
+  endpointUrl: string,
+  installationId: string,
+  source: EventSource = "claude-code"
+): Promise<{ flushed: number; errors: number }> {
+  const queue = new EventQueue();
+  let totalFlushed = 0;
+  let errorCount = 0;
+
+  while (true) {
+    const batch = await queue.peekBatch(20);
+    if (batch.length === 0) break;
+
+    const res = await sendEventBatch({
+      endpointUrl,
+      installationId,
+      sessionId: batch[0].sessionId,
+      source,
+      events: batch,
+    });
+
+    if (res.success) {
+      await queue.acknowledge(batch.map((e) => e.eventId));
+      totalFlushed += batch.length;
+    } else {
+      errorCount++;
+      break; // stop on failure to avoid looping
+    }
+  }
+
+  return { flushed: totalFlushed, errors: errorCount };
+}

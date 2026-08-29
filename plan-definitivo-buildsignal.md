@@ -317,22 +317,22 @@ La captura y la lógica de privacidad viven localmente. Convex coordina el estad
 
 ## 8. Stack tecnológico
 
-| Área | Tecnología |
-|---|---|
-| Lenguaje | TypeScript |
-| Monorepo | pnpm workspaces o Turborepo |
-| Plugin | Node.js |
-| Integración | Hooks de Claude Code y Codex |
-| Contratos | Zod |
-| Backend | Convex |
-| Autenticación | Clerk |
-| Frontend | Next.js + React |
-| UI | Tailwind CSS + shadcn/ui |
-| IA | Proveedor intercambiable |
-| Código resaltado | Shiki |
-| Render de imagen | React + html-to-image |
-| Archivos | Convex File Storage |
-| Hosting | Vercel |
+| Área             | Tecnología                   |
+| ---------------- | ---------------------------- |
+| Lenguaje         | TypeScript                   |
+| Monorepo         | pnpm workspaces o Turborepo  |
+| Plugin           | Node.js                      |
+| Integración      | Hooks de Claude Code y Codex |
+| Contratos        | Zod                          |
+| Backend          | Convex                       |
+| Autenticación    | Clerk                        |
+| Frontend         | Next.js + React              |
+| UI               | Tailwind CSS + shadcn/ui     |
+| IA               | Proveedor intercambiable     |
+| Código resaltado | Shiki                        |
+| Render de imagen | React + html-to-image        |
+| Archivos         | Convex File Storage          |
+| Hosting          | Vercel                       |
 
 ### Decisiones de bajo costo
 
@@ -563,11 +563,11 @@ Valor =
 
 ### Umbrales
 
-| Puntaje | Acción |
-|---:|---|
-| 70–100 | Generar post e imagen |
-| 45–69 | Guardar como sugerencia |
-| 0–44 | No notificar |
+| Puntaje | Acción                  |
+| ------: | ----------------------- |
+|  70–100 | Generar post e imagen   |
+|   45–69 | Guardar como sugerencia |
+|    0–44 | No notificar            |
 
 ### Resultado estructurado
 
@@ -942,18 +942,18 @@ Existe una demo reproducible y un respaldo sanitizado.
 
 ## 17. Cronograma de 12 horas
 
-| Horas | Trabajo |
-|---:|---|
-| 0:00–0:30 | Alcance, roles y contratos |
-| 0:30–2:00 | Monorepo, Next.js, Convex y Clerk |
-| 2:00–4:00 | Hooks, colector e ingestión |
-| 4:00–5:00 | Sanitización |
-| 5:00–6:30 | Detector de momentos |
-| 6:30–7:30 | Generación del post |
-| 7:30–9:30 | Generador de imagen |
-| 9:30–10:30 | Integración completa |
-| 10:30–11:30 | QA y correcciones |
-| 11:30–12:00 | Ensayo de demo |
+|       Horas | Trabajo                           |
+| ----------: | --------------------------------- |
+|   0:00–0:30 | Alcance, roles y contratos        |
+|   0:30–2:00 | Monorepo, Next.js, Convex y Clerk |
+|   2:00–4:00 | Hooks, colector e ingestión       |
+|   4:00–5:00 | Sanitización                      |
+|   5:00–6:30 | Detector de momentos              |
+|   6:30–7:30 | Generación del post               |
+|   7:30–9:30 | Generador de imagen               |
+|  9:30–10:30 | Integración completa              |
+| 10:30–11:30 | QA y correcciones                 |
+| 11:30–12:00 | Ensayo de demo                    |
 
 ### Regla de integración
 
@@ -965,20 +965,20 @@ A más tardar en la hora 8, todos deben detener el trabajo aislado y concentrars
 
 ### Equipo de cuatro
 
-| Persona | Responsabilidad |
-|---|---|
-| A | Plugin, hooks, colector y cola local |
-| B | Convex, autenticación y almacenamiento |
-| C | Motor de valor y generación de contenido |
-| D | Dashboard, diseño y render de imagen |
+| Persona | Responsabilidad                          |
+| ------- | ---------------------------------------- |
+| A       | Plugin, hooks, colector y cola local     |
+| B       | Convex, autenticación y almacenamiento   |
+| C       | Motor de valor y generación de contenido |
+| D       | Dashboard, diseño y render de imagen     |
 
 ### Equipo de tres
 
-| Persona | Responsabilidad |
-|---|---|
-| A | Plugin y sanitización |
-| B | Convex y motor de valor |
-| C | Dashboard e imagen |
+| Persona | Responsabilidad         |
+| ------- | ----------------------- |
+| A       | Plugin y sanitización   |
+| B       | Convex y motor de valor |
+| C       | Dashboard e imagen      |
 
 ### Responsabilidad compartida
 
@@ -1034,18 +1034,18 @@ A más tardar en la hora 8, todos deben detener el trabajo aislado y concentrars
 
 ## 20. Métricas y criterios de aceptación
 
-| Métrica | Objetivo |
-|---|---:|
-| Instalación | Menos de 2 minutos |
-| Hook síncrono | Menos de 100–150 ms |
-| Evento visible | Menos de 5 segundos |
-| Análisis | Menos de 30 segundos |
-| Secretos filtrados | 0 |
-| Casos relevantes detectados | 4 de 5 preparados |
-| Falsos positivos | Máximo 1 por sesión |
-| Producción completa | Menos de 3 minutos tras terminar |
-| Imagen | 1080 × 1350, menos de 2 MB |
-| Intervención técnica | Ninguna durante el recorrido normal |
+| Métrica                     |                            Objetivo |
+| --------------------------- | ----------------------------------: |
+| Instalación                 |                  Menos de 2 minutos |
+| Hook síncrono               |                 Menos de 100–150 ms |
+| Evento visible              |                 Menos de 5 segundos |
+| Análisis                    |                Menos de 30 segundos |
+| Secretos filtrados          |                                   0 |
+| Casos relevantes detectados |                   4 de 5 preparados |
+| Falsos positivos            |                 Máximo 1 por sesión |
+| Producción completa         |    Menos de 3 minutos tras terminar |
+| Imagen                      |          1080 × 1350, menos de 2 MB |
+| Intervención técnica        | Ninguna durante el recorrido normal |
 
 ### Métrica de producto posterior
 
@@ -1071,15 +1071,15 @@ Contenido listo
 
 ### Manejo de fallos
 
-| Fallo | Comportamiento |
-|---|---|
-| Convex no responde | Guardar en cola local y reintentar |
-| Modelo falla | Conservar sesión y mostrar reintento |
-| Imagen falla | Mantener preview y regenerar |
-| No existe valor | No notificar |
-| Secreto detectado | Bloquear y solicitar revisión |
-| Evento duplicado | Ignorar por `eventId` |
-| Sesión incompleta | Guardar como pendiente |
+| Fallo              | Comportamiento                       |
+| ------------------ | ------------------------------------ |
+| Convex no responde | Guardar en cola local y reintentar   |
+| Modelo falla       | Conservar sesión y mostrar reintento |
+| Imagen falla       | Mantener preview y regenerar         |
+| No existe valor    | No notificar                         |
+| Secreto detectado  | Bloquear y solicitar revisión        |
+| Evento duplicado   | Ignorar por `eventId`                |
+| Sesión incompleta  | Guardar como pendiente               |
 
 ---
 
@@ -1132,17 +1132,17 @@ Mantener una sesión real previamente sanitizada que pueda reproducirse si falla
 
 ## 23. Riesgos y mitigaciones
 
-| Riesgo | Impacto | Mitigación |
-|---|---|---|
-| Filtración de secretos | Crítico | Sanitización local, `.contentignore`, pruebas sembradas |
-| Demasiados falsos positivos | Alto | Prefiltro, umbral alto, feedback |
-| Contenido genérico | Alto | Evidencia real, estructura narrativa, estilo personal |
-| Interrupción del flujo | Alto | Hooks asíncronos, notificación solo al final |
-| Fragmentación entre agentes | Medio | Contrato común y adaptadores separados |
-| Imagen ilegible | Medio | Plantillas programáticas y QA móvil |
-| Dependencia del modelo | Medio | Interfaz de proveedor y validación Zod |
-| Demo dependiente de red | Medio | Sesión sanitizada reproducible |
-| Expansión de alcance | Alto | MoSCoW cerrado y checkpoint cada 3 horas |
+| Riesgo                      | Impacto | Mitigación                                              |
+| --------------------------- | ------- | ------------------------------------------------------- |
+| Filtración de secretos      | Crítico | Sanitización local, `.contentignore`, pruebas sembradas |
+| Demasiados falsos positivos | Alto    | Prefiltro, umbral alto, feedback                        |
+| Contenido genérico          | Alto    | Evidencia real, estructura narrativa, estilo personal   |
+| Interrupción del flujo      | Alto    | Hooks asíncronos, notificación solo al final            |
+| Fragmentación entre agentes | Medio   | Contrato común y adaptadores separados                  |
+| Imagen ilegible             | Medio   | Plantillas programáticas y QA móvil                     |
+| Dependencia del modelo      | Medio   | Interfaz de proveedor y validación Zod                  |
+| Demo dependiente de red     | Medio   | Sesión sanitizada reproducible                          |
+| Expansión de alcance        | Alto    | MoSCoW cerrado y checkpoint cada 3 horas                |
 
 ---
 
@@ -1182,12 +1182,12 @@ Descarga por red social
 
 ### Presets previstos
 
-| Uso | Resolución | Relación |
-|---|---:|---:|
-| TikTok, Reels, Shorts | 1080 × 1920 | 9:16 |
-| LinkedIn vertical | 1080 × 1350 | 4:5 |
-| Cuadrado | 1080 × 1080 | 1:1 |
-| YouTube tradicional | 1920 × 1080 | 16:9 |
+| Uso                   |  Resolución | Relación |
+| --------------------- | ----------: | -------: |
+| TikTok, Reels, Shorts | 1080 × 1920 |     9:16 |
+| LinkedIn vertical     | 1080 × 1350 |      4:5 |
+| Cuadrado              | 1080 × 1080 |      1:1 |
+| YouTube tradicional   | 1920 × 1080 |     16:9 |
 
 ### Tecnologías previstas
 
@@ -1305,4 +1305,3 @@ La demostración debe probar una sola transformación con claridad:
 - [Convex y Clerk](https://docs.convex.dev/auth/clerk)
 - [Límites de Convex](https://docs.convex.dev/production/state/limits)
 - [Tareas programadas de ChatGPT](https://learn.chatgpt.com/docs/automations)
-

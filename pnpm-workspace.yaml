@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+  - plugins/*
+allowBuilds:
+  '@clerk/shared': true
+  '@google/genai': true
+  esbuild: true
+  protobufjs: true
+catalog:
+  dotenv: ^17.4.2
+  zod: ^4.4.3
+  convex: ^1.45.0
+  "@types/node": ^26.2.0

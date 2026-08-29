@@ -1,0 +1,36 @@
+{
+  "name": "hackathon-craft-station",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "plugins/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F @hackathon-craft-station/backend dev",
+    "dev:setup": "turbo -F @hackathon-craft-station/backend dev:setup",
+    "test": "turbo test",
+    "simulate": "node scripts/simulate-session.mjs",
+    "buildsignal": "node ./plugins/claude-code/bin/buildsignal.mjs"
+  },
+  "dependencies": {
+    "@hackathon-craft-station/collector": "workspace:*",
+    "@hackathon-craft-station/env": "workspace:*",
+    "@hackathon-craft-station/sanitizer": "workspace:*",
+    "@hackathon-craft-station/shared-types": "workspace:*",
+    "@hackathon-craft-station/value-engine": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@hackathon-craft-station/config": "workspace:*",
+    "turbo": "2.10.11",
+    "typescript": "^6.0.3"
+  },
+  "packageManager": "pnpm@11.17.0"
+}

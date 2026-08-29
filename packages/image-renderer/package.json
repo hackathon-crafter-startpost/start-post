@@ -1,0 +1,29 @@
+{
+  "name": "@hackathon-craft-station/image-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "dependencies": {
+    "@hackathon-craft-station/shared-types": "workspace:*",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.21.0"
+  },
+  "devDependencies": {
+    "@hackathon-craft-station/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5"
+  }
+}

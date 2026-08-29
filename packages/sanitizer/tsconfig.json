@@ -1,0 +1,12 @@
+{
+  "extends": "@hackathon-craft-station/config/tsconfig.base.json",
+  "compilerOptions": {
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "target": "ESNext",
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

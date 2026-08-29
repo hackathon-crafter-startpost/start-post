@@ -1,0 +1,10 @@
+{
+  "name": "buildsignal-claude-code",
+  "version": "1.0.0",
+  "description": "BuildSignal hook plugin for Claude Code agent sessions",
+  "hooks": {
+    "onUserPrompt": "node ./bin/buildsignal-hook.mjs",
+    "onToolResult": "node ./bin/buildsignal-hook.mjs",
+    "onTurnStop": "node ./bin/buildsignal-hook.mjs"
+  }
+}

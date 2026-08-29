@@ -1,0 +1,14 @@
+{
+  "name": "@hackathon-craft-station/plugin-codex",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "codex-hook": "./bin/codex-hook.mjs"
+  },
+  "dependencies": {
+    "@hackathon-craft-station/collector": "workspace:*",
+    "@hackathon-craft-station/sanitizer": "workspace:*",
+    "@hackathon-craft-station/shared-types": "workspace:*"
+  }
+}
