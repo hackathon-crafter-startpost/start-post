@@ -61,16 +61,16 @@ export default function ConnectAgentPage() {
     }
   };
 
-  const linkCommand = `npx buildsignal link ${token}`;
-  const installCommand = `npx buildsignal install`;
-  const simulateCommand = `npx buildsignal simulate`;
+  const linkCommand = `npx buildsignal-cli link ${token}`;
+  const installCommand = `npx buildsignal-cli install`;
+  const simulateCommand = `npx buildsignal-cli simulate`;
 
   const claudeManualConfig = JSON.stringify(
     {
       hooks: {
-        onUserPrompt: "npx @hackathon-craft-station/plugin-claude-code-hook",
-        onToolResult: "npx @hackathon-craft-station/plugin-claude-code-hook",
-        onTurnStop: "npx @hackathon-craft-station/plugin-claude-code-hook",
+        onUserPrompt: "npx buildsignal-cli buildsignal-hook",
+        onToolResult: "npx buildsignal-cli buildsignal-hook",
+        onTurnStop: "npx buildsignal-cli buildsignal-hook",
       },
     },
     null,
@@ -80,8 +80,8 @@ export default function ConnectAgentPage() {
   const codexManualConfig = JSON.stringify(
     {
       hooks: {
-        onMessage: "npx @hackathon-craft-station/plugin-codex-hook",
-        onToolCall: "npx @hackathon-craft-station/plugin-codex-hook",
+        onMessage: "npx buildsignal-cli buildsignal-hook",
+        onToolCall: "npx buildsignal-cli buildsignal-hook",
       },
     },
     null,

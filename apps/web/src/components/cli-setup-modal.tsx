@@ -33,15 +33,15 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
 
   if (!isOpen) return null;
 
-  const linkCommand = `npx buildsignal link ${token}`;
-  const installCommand = `npx buildsignal install`;
+  const linkCommand = `npx buildsignal-cli link ${token}`;
+  const installCommand = `npx buildsignal-cli install`;
 
   const claudeConfig = JSON.stringify(
     {
       hooks: {
-        onUserPrompt: "npx @hackathon-craft-station/plugin-claude-code-hook",
-        onToolResult: "npx @hackathon-craft-station/plugin-claude-code-hook",
-        onTurnStop: "npx @hackathon-craft-station/plugin-claude-code-hook",
+        onUserPrompt: "npx buildsignal-cli buildsignal-hook",
+        onToolResult: "npx buildsignal-cli buildsignal-hook",
+        onTurnStop: "npx buildsignal-cli buildsignal-hook",
       },
     },
     null,
@@ -51,8 +51,8 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
   const codexConfig = JSON.stringify(
     {
       hooks: {
-        onMessage: "npx @hackathon-craft-station/plugin-codex-hook",
-        onToolCall: "npx @hackathon-craft-station/plugin-codex-hook",
+        onMessage: "npx buildsignal-cli buildsignal-hook",
+        onToolCall: "npx buildsignal-cli buildsignal-hook",
       },
     },
     null,
