@@ -1,15 +1,25 @@
 {
-  "name": "@hackathon-craft-station/plugin-claude-code",
+  "name": "buildsignal-cli",
   "version": "1.0.0",
-  "private": true,
+  "description": "BuildSignal CLI & Agent Observer with Zero-Leak Local Privacy",
   "type": "module",
   "bin": {
     "buildsignal": "./bin/buildsignal.mjs",
     "buildsignal-hook": "./bin/buildsignal-hook.mjs"
   },
-  "dependencies": {
-    "@hackathon-craft-station/collector": "workspace:*",
-    "@hackathon-craft-station/sanitizer": "workspace:*",
-    "@hackathon-craft-station/shared-types": "workspace:*"
-  }
+  "files": [
+    "bin",
+    "plugin.json",
+    "README.md"
+  ],
+  "keywords": [
+    "buildsignal",
+    "claude-code",
+    "codex",
+    "ai-agent",
+    "telemetry",
+    "developer-tools"
+  ],
+  "author": "BuildSignal",
+  "license": "MIT"
 }

@@ -350,17 +350,7 @@ importers:
         specifier: 4.1.8
         version: 4.1.8(@types/node@26.4.0)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.27.0)(jiti@2.7.0))
 
-  plugins/claude-code:
-    dependencies:
-      '@hackathon-craft-station/collector':
-        specifier: workspace:*
-        version: link:../../packages/collector
-      '@hackathon-craft-station/sanitizer':
-        specifier: workspace:*
-        version: link:../../packages/sanitizer
-      '@hackathon-craft-station/shared-types':
-        specifier: workspace:*
-        version: link:../../packages/shared-types
+  plugins/claude-code: {}
 
   plugins/codex:
     dependencies:
