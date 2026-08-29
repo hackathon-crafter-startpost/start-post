@@ -1120,7 +1120,7 @@ export default function DashboardPage() {
                             Video Interactivo HyperFrames
                           </h3>
                           <p className="text-xs text-[#6e6e73] dark:text-[#86868b] mt-0.5">
-                            Composición HTML seekable con diff animado y lección técnica.
+                            Motor de video 60 FPS con resolución nativa, diff de código animado y lección técnica.
                           </p>
                         </div>
 
@@ -1310,12 +1310,12 @@ export default function DashboardPage() {
                           <span className="text-[#30d158]">Tests: 100% Passing</span>
                         </div>
                         {activeManifest.codeBefore && (
-                          <div className="p-2.5 rounded bg-[#ff453a]/15 text-[#ff9b9b] border-l-4 border-[#ff453a] mb-2 overflow-x-auto">
+                          <div className="p-2.5 rounded-lg bg-[#ff453a]/10 text-[#ff9b9b] border border-[#ff453a]/25 mb-2 overflow-x-auto">
                             - {activeManifest.codeBefore}
                           </div>
                         )}
                         {activeManifest.codeAfter && (
-                          <div className="p-2.5 rounded bg-[#30d158]/15 text-[#a8f5ba] border-l-4 border-[#30d158] overflow-x-auto">
+                          <div className="p-2.5 rounded-lg bg-[#30d158]/10 text-[#a8f5ba] border border-[#30d158]/25 overflow-x-auto">
                             + {activeManifest.codeAfter}
                           </div>
                         )}
