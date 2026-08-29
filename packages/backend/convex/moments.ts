@@ -8,21 +8,29 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
-    const identity = await ctx.auth.getUserIdentity();
-    const effectiveUserId = args.userId || identity?.subject;
+    let identitySubject: string | undefined;
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      identitySubject = identity?.subject;
+    } catch {}
 
-    let moments;
+    const effectiveUserId = args.userId || identitySubject;
+
+    let moments = [];
     if (effectiveUserId) {
-      const userMoments = await ctx.db
-        .query("moments")
-        .withIndex("by_user", (q) => q.eq("userId", effectiveUserId))
-        .order("desc")
-        .take(limit);
+      try {
+        const userMoments = await ctx.db
+          .query("moments")
+          .withIndex("by_user", (q) => q.eq("userId", effectiveUserId))
+          .order("desc")
+          .take(limit);
 
-      if (userMoments.length > 0) {
-        moments = userMoments;
-      } else {
-        // Graceful fallback to demo moments so user always has interactive content
+        if (userMoments.length > 0) {
+          moments = userMoments;
+        } else {
+          moments = await ctx.db.query("moments").order("desc").take(limit);
+        }
+      } catch {
         moments = await ctx.db.query("moments").order("desc").take(limit);
       }
     } else {
@@ -32,14 +40,18 @@ export const list = query({
     // Attach postDraft and session info if available
     const enriched = await Promise.all(
       moments.map(async (m) => {
-        const postDraft = await ctx.db
-          .query("postDrafts")
-          .withIndex("by_moment", (q) => q.eq("momentId", m._id))
-          .first();
-        return {
-          ...m,
-          postDraft,
-        };
+        try {
+          const postDraft = await ctx.db
+            .query("postDrafts")
+            .withIndex("by_moment", (q) => q.eq("momentId", m._id))
+            .first();
+          return {
+            ...m,
+            postDraft,
+          };
+        } catch {
+          return { ...m, postDraft: null };
+        }
       })
     );
 

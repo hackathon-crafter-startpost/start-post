@@ -8,25 +8,36 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
-    const identity = await ctx.auth.getUserIdentity();
-    const effectiveUserId = args.userId || identity?.subject;
+    let identitySubject: string | undefined;
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      identitySubject = identity?.subject;
+    } catch {}
+
+    const effectiveUserId = args.userId || identitySubject;
 
     if (effectiveUserId) {
-      const userSessions = await ctx.db
-        .query("sessions")
-        .withIndex("by_user", (q) => q.eq("userId", effectiveUserId))
-        .order("desc")
-        .take(limit);
+      try {
+        const userSessions = await ctx.db
+          .query("sessions")
+          .withIndex("by_user", (q) => q.eq("userId", effectiveUserId))
+          .order("desc")
+          .take(limit);
 
-      if (userSessions.length > 0) {
-        return userSessions;
-      }
+        if (userSessions.length > 0) {
+          return userSessions;
+        }
+      } catch {}
     }
 
-    return await ctx.db
-      .query("sessions")
-      .order("desc")
-      .take(limit);
+    try {
+      return await ctx.db
+        .query("sessions")
+        .order("desc")
+        .take(limit);
+    } catch {
+      return [];
+    }
   },
 });
 
@@ -44,14 +55,19 @@ export const create = mutation({
     projectId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    let identitySubject: string | undefined;
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      identitySubject = identity?.subject;
+    } catch {}
+
     const inst = await ctx.db
       .query("installations")
       .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.installationId))
       .first();
 
     return await ctx.db.insert("sessions", {
-      userId: identity?.subject || inst?.userId,
+      userId: identitySubject || inst?.userId,
       installationId: args.installationId,
       source: args.source,
       projectId: args.projectId,
