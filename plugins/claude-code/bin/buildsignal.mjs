@@ -466,6 +466,151 @@ export function installCodexHooks(customHookPath) {
   return { success: true, configPath: codexConfigPath };
 }
 
+export function normalizeAntigravityEvent(raw, installationId) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const hasUserInput = raw.type === "USER_INPUT" || !!raw.user_input || !!raw.prompt || !!raw.message;
+  const hasToolCalls = Array.isArray(raw.tool_calls) && raw.tool_calls.length > 0;
+  const hasTool = !!(raw.tool || raw.toolName || raw.name || hasToolCalls);
+  const hasContent = !!raw.content;
+  const hasStatus = !!raw.status;
+
+  if (!hasUserInput && !hasTool && !hasContent && !hasStatus && !raw.type && !raw.summary) {
+    return null;
+  }
+
+  const explicitSessionId =
+    raw.conversation_id ||
+    raw.conversationId ||
+    raw.session_id ||
+    raw.sessionId ||
+    process.env.ANTIGRAVITY_CONVERSATION_ID ||
+    process.env.SESSION_ID;
+
+  const sessionId = explicitSessionId || getActiveSessionId(process.cwd());
+  let eventType = "tool_result";
+  let payload = {};
+
+  if (raw.type === "USER_INPUT" || (hasUserInput && !hasTool)) {
+    eventType = "user_prompt";
+    payload = {
+      prompt: raw.content || raw.user_input || raw.prompt || raw.message || "",
+    };
+  } else if (hasToolCalls) {
+    const firstTool = raw.tool_calls[0];
+    const toolName = firstTool.name || firstTool.tool || "";
+    const args = firstTool.args || firstTool.parameters || {};
+
+    if (toolName === "replace_file_content" || toolName === "write_to_file") {
+      eventType = "file_changed";
+      payload = {
+        tool: toolName,
+        filePath: args.TargetFile || args.path || args.file_path,
+        diff: args.TargetContent ? `-${args.TargetContent}\n+${args.ReplacementContent}` : undefined,
+        codeBefore: args.TargetContent,
+        codeAfter: args.ReplacementContent || args.CodeContent,
+      };
+    } else if (toolName === "run_command") {
+      const cmd = args.CommandLine || args.command || "";
+      const isTest =
+        cmd.includes("test") ||
+        cmd.includes("vitest") ||
+        cmd.includes("jest") ||
+        cmd.includes("pytest") ||
+        cmd.includes("cargo test") ||
+        cmd.includes("go test");
+
+      const exitCode = raw.status === "ERROR" || raw.exitCode === 1 ? 1 : 0;
+      eventType = isTest ? (exitCode === 0 ? "test_passed" : "test_failed") : "tool_result";
+      payload = {
+        tool: toolName,
+        command: cmd,
+        output: raw.content || raw.output || "",
+        exitCode,
+      };
+    } else {
+      eventType = "tool_result";
+      payload = {
+        tool: toolName,
+        args,
+        output: raw.content || "",
+      };
+    }
+  } else if (raw.type === "file_changed" || raw.filePath || raw.TargetFile) {
+    eventType = "file_changed";
+    payload = {
+      filePath: raw.filePath || raw.TargetFile || raw.path,
+      diff: raw.diff,
+      codeBefore: raw.codeBefore || raw.TargetContent,
+      codeAfter: raw.codeAfter || raw.ReplacementContent || raw.CodeContent,
+    };
+  } else if (raw.command || raw.CommandLine) {
+    const cmd = raw.command || raw.CommandLine || "";
+    const isTest =
+      cmd.includes("test") ||
+      cmd.includes("vitest") ||
+      cmd.includes("jest") ||
+      cmd.includes("pytest") ||
+      cmd.includes("cargo test") ||
+      cmd.includes("go test");
+
+    const exitCode = raw.exitCode ?? raw.exit_code ?? (raw.status === "ERROR" ? 1 : 0);
+    eventType = isTest ? (exitCode === 0 ? "test_passed" : "test_failed") : "tool_result";
+    payload = {
+      command: cmd,
+      exitCode,
+      output: raw.output || raw.content || "",
+    };
+  } else {
+    payload = { ...raw };
+  }
+
+  const rawEvent = {
+    eventId: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
+    sessionId,
+    installationId,
+    source: "antigravity",
+    type: eventType,
+    timestamp: Date.now(),
+    payload,
+    summary: raw.summary,
+    sanitized: false,
+  };
+
+  return sanitizeEvent(rawEvent);
+}
+
+export function installAntigravityHooks(customHookPath) {
+  const agyDir = path.join(os.homedir(), ".gemini", "antigravity-cli");
+  const agyHooksDir = path.join(agyDir, "hooks");
+
+  if (!fs.existsSync(agyHooksDir)) {
+    try {
+      fs.mkdirSync(agyHooksDir, { recursive: true });
+    } catch {}
+  }
+
+  const hookTarget = path.join(agyHooksDir, "buildsignal-antigravity.json");
+  const hookCmd = customHookPath
+    ? `node "${customHookPath}"`
+    : `npx buildsignal-hook --source antigravity`;
+
+  const config = {
+    name: "buildsignal-collector",
+    source: "antigravity",
+    command: hookCmd,
+    enabled: true,
+    installedAt: new Date().toISOString(),
+  };
+
+  try {
+    fs.writeFileSync(hookTarget, JSON.stringify(config, null, 2), "utf8");
+  } catch {}
+
+  return { success: true, configPath: hookTarget };
+}
+
+
 /* =========================================================================
    CLI Command Handlers
 ========================================================================= */
@@ -611,6 +756,7 @@ async function handleInstall(target = "all") {
   const scriptDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"));
   const claudeHookPath = path.resolve(scriptDir, "buildsignal-hook.mjs");
   const codexHookPath = path.resolve(scriptDir, "buildsignal-hook.mjs");
+  const agyHookPath = path.resolve(scriptDir, "buildsignal-hook.mjs");
 
   if (target === "all" || target === "claude") {
     const res = installClaudeHooks(claudeHookPath);
@@ -622,7 +768,12 @@ async function handleInstall(target = "all") {
     console.log(`✅ OpenAI Codex hooks configurados en: ${res.configPath}`);
   }
 
-  console.log("\n🚀 ¡Listo! Tus sesiones de Claude Code y Codex reportarán eventos automáticamente con Zero-Leak.\n");
+  if (target === "all" || target === "antigravity" || target === "agy") {
+    const res = installAntigravityHooks(agyHookPath);
+    console.log(`✅ Antigravity agent hooks configurados en: ${res.configPath}`);
+  }
+
+  console.log("\n🚀 ¡Listo! Tus sesiones de Claude Code, Codex y Antigravity reportarán eventos automáticamente con Zero-Leak.\n");
 }
 
 async function handleFlush() {

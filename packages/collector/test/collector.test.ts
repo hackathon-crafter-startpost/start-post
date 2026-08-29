@@ -3,6 +3,7 @@ import {
   createEvent,
   normalizeClaudeEvent,
   normalizeCodexEvent,
+  normalizeAntigravityEvent,
   EventQueue,
   sendEventBatch,
 } from "../src/index";
@@ -68,6 +69,43 @@ describe("Collector Engine", () => {
     expect(event.type).toBe("user_prompt");
     expect(event.source).toBe("codex");
     expect(event.sessionId).toBe("codex-conv-1");
+  });
+
+  it("normalizes Antigravity hook / harness step data into SessionEvents", () => {
+    const rawAgyPrompt = {
+      type: "USER_INPUT",
+      content: "Corrige el problema de fuga de memoria en el stream de audio",
+      conversation_id: "agy-conv-777",
+    };
+
+    const promptEvt = normalizeAntigravityEvent(rawAgyPrompt, "inst-agy");
+    expect(promptEvt?.type).toBe("user_prompt");
+    expect(promptEvt?.source).toBe("antigravity");
+    expect(promptEvt?.sessionId).toBe("agy-conv-777");
+    expect(promptEvt?.payload.prompt).toBe("Corrige el problema de fuga de memoria en el stream de audio");
+
+    const rawAgyToolCall = {
+      type: "PLANNER_RESPONSE",
+      conversation_id: "agy-conv-777",
+      status: "DONE",
+      tool_calls: [
+        {
+          name: "replace_file_content",
+          args: {
+            TargetFile: "C:/PROYECTOS/repo/src/stream.ts",
+            TargetContent: "buffer.dispose = false;",
+            ReplacementContent: "buffer.dispose = true;",
+          },
+        },
+      ],
+    };
+
+    const toolEvt = normalizeAntigravityEvent(rawAgyToolCall, "inst-agy");
+    expect(toolEvt?.type).toBe("file_changed");
+    expect(toolEvt?.source).toBe("antigravity");
+    expect(toolEvt?.payload.tool).toBe("replace_file_content");
+    expect(toolEvt?.payload.codeBefore).toBe("buffer.dispose = false;");
+    expect(toolEvt?.payload.codeAfter).toBe("buffer.dispose = true;");
   });
 
   it("queues and retrieves events in memory/disk queue", async () => {

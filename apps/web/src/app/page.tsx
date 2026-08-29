@@ -72,21 +72,21 @@ export default function DashboardPage() {
   // Visual card customizer state (Apple HIG Palette)
   const [customAuthor, setCustomAuthor] = useState("Diego");
   const [customAccent, setCustomAccent] = useState("#0066cc");
-  const [customTemplate, setCustomTemplate] = useState<"bug-fix" | "lesson" | "before-after">("bug-fix");
+  const [customTemplate, setCustomTemplate] = useState<string>("bug-fix");
   const [cardZoom, setCardZoom] = useState<number>(0.42);
   const [copied, setCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-
+  const [isRegeneratingNanoBanana, setIsRegeneratingNanoBanana] = useState(false);
 
   const generateUploadUrl = useMutation(api.assets.generateUploadUrl);
   const saveAsset = useMutation(api.assets.saveAsset);
   const registerFeedback = useMutation(api.feedback.register);
   const updatePostDraft = useMutation(api.generation.updatePostDraft);
   const analyzeWithGemini = useAction(api.generation.analyzeWithGoogleGemini);
+  const regenerateWithNanoBanana = useAction(api.generation.regenerateWithNanoBanana);
   const publishToBuffer = useAction(api.buffer.publishPost);
   const createBufferIdea = useAction(api.buffer.createIdea);
-
 
   const handleGenerateWithGemini = async () => {
     if (!activeMoment?.sessionId) return;
@@ -104,6 +104,29 @@ export default function DashboardPage() {
       toast.error("Error al sintetizar: " + (err?.message || ""));
     } finally {
       setIsGeneratingAi(false);
+    }
+  };
+
+  const handleRegenerateNanoBanana = async (stylePreset: string = "infographic") => {
+    if (!activeMoment?._id) return;
+    try {
+      setIsRegeneratingNanoBanana(true);
+      toast.info("Regenerando con Nano Banana (Gemini 2.5 Flash)...");
+      const res = await regenerateWithNanoBanana({
+        momentId: activeMoment._id,
+        stylePreset,
+      });
+      if (res.success) {
+        toast.success("¡Diseño y narrativa regenerados!", {
+          description: "Infografía visual, métricas y storytelling en 1ª persona listos.",
+        });
+      } else {
+        toast.error(res.error || "No se pudo regenerar");
+      }
+    } catch (err: any) {
+      toast.error("Error al regenerar: " + (err?.message || ""));
+    } finally {
+      setIsRegeneratingNanoBanana(false);
     }
   };
 
@@ -354,18 +377,21 @@ export default function DashboardPage() {
 
 
   // Merged image manifest
+  const draftManifest = activeMoment?.postDraft?.imageManifest as any;
   const activeManifest: ImageManifest = {
-    template: customTemplate,
-    headline: activeMoment?.title || "Momento de Código Verificado",
-    eyebrow: "LECCIÓN TÉCNICA",
-    problem: activeMoment?.problem || "Problema observado durante la sesión.",
-    codeBefore: activeMoment?.postDraft?.imageManifest?.codeBefore,
-    codeAfter: activeMoment?.postDraft?.imageManifest?.codeAfter,
-    result: activeMoment?.postDraft?.imageManifest?.result || "Tests 100% Passing",
-    takeaway: activeMoment?.lesson || "Lección aprendida en la sesión.",
+    template: (draftManifest?.template as any) || (customTemplate as any) || "infographic",
+    headline: draftManifest?.headline || activeMoment?.title || "Momento de Código Verificado",
+    eyebrow: draftManifest?.eyebrow || "APRENDIZAJE REAL EN CÓDIGO",
+    problem: draftManifest?.problem || activeMoment?.problem || "Problema observado durante la sesión.",
+    codeBefore: draftManifest?.codeBefore,
+    codeAfter: draftManifest?.codeAfter,
+    result: draftManifest?.result || "Tests 100% Passing",
+    takeaway: draftManifest?.takeaway || activeMoment?.lesson || "Lección aprendida en la sesión.",
     accentColor: customAccent,
     authorName: customAuthor,
     category: activeMoment?.category || "bug_fix",
+    metrics: draftManifest?.metrics,
+    diagramNodes: draftManifest?.diagramNodes,
   };
 
   return (
@@ -793,6 +819,15 @@ export default function DashboardPage() {
                           ) : (
                             <>
                               <button
+                                onClick={() => handleRegenerateNanoBanana("infographic")}
+                                disabled={isRegeneratingNanoBanana}
+                                className="apple-btn-secondary text-[12px] sm:text-[13px] py-1.5 px-3 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[36px] border-[#ff9f0a]/30 text-[#ff9f0a] hover:bg-[#ff9f0a]/10"
+                                title="Regenerar narrativa y diseño de infografía gráfica con Nano Banana"
+                              >
+                                <Sparkles className={`size-3.5 ${isRegeneratingNanoBanana ? "animate-spin" : ""}`} />
+                                <span>{isRegeneratingNanoBanana ? "Creando..." : "Nano Banana"}</span>
+                              </button>
+                              <button
                                 onClick={handleGenerateWithGemini}
                                 disabled={isGeneratingAi}
                                 className="apple-btn-secondary text-[12px] sm:text-[13px] py-1.5 px-3 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[36px]"
@@ -1175,7 +1210,16 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Export & Buffer Action Buttons */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => handleRegenerateNanoBanana("infographic")}
+                            disabled={isRegeneratingNanoBanana}
+                            className="apple-btn-secondary py-1.5 px-3.5 text-xs flex items-center gap-1.5 min-h-[36px] border-[#ff9f0a]/30 text-[#ff9f0a] hover:bg-[#ff9f0a]/10"
+                            title="Regenerar diseño e infografía visual con Nano Banana (Gemini)"
+                          >
+                            <Sparkles className={`size-3.5 ${isRegeneratingNanoBanana ? "animate-spin" : ""}`} />
+                            <span>{isRegeneratingNanoBanana ? "Regenerando..." : "Nano Banana"}</span>
+                          </button>
                           <button
                             onClick={handleDownloadPNG}
                             disabled={isExporting}
@@ -1193,6 +1237,28 @@ export default function DashboardPage() {
                             <span>Publicar en Buffer</span>
                           </button>
                         </div>
+                      </div>
+
+                      {/* Graphic Presets Filter Strip */}
+                      <div className="flex items-center gap-2 self-start px-2 text-xs">
+                        <span className="text-[#6e6e73] dark:text-[#86868b] font-medium text-[11px] uppercase">
+                          Estilo Gráfico:
+                        </span>
+                        {[
+                          { id: "infographic", label: "✨ Infografía" },
+                          { id: "performance", label: "⚡ Métricas" },
+                          { id: "architecture", label: "🏗️ Arquitectura" },
+                          { id: "bug-fix", label: "🐞 macOS Diff" },
+                        ].map((preset) => (
+                          <button
+                            key={preset.id}
+                            onClick={() => handleRegenerateNanoBanana(preset.id)}
+                            disabled={isRegeneratingNanoBanana}
+                            className="px-3 py-1 rounded-full text-xs font-medium bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 transition-colors cursor-pointer text-[#1d1d1f] dark:text-white disabled:opacity-50"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
                       </div>
 
                       {/* Responsive Card Preview Container on Pedestal */}

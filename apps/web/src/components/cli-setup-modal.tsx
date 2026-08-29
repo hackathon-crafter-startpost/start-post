@@ -14,7 +14,7 @@ interface CliSetupModalProps {
 }
 
 export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
-  const [activeTab, setActiveTab] = useState<"quick" | "claude" | "codex">("quick");
+  const [activeTab, setActiveTab] = useState<"quick" | "claude" | "codex" | "antigravity">("quick");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [token, setToken] = useState<string>("bs_tok_local_dev_key");
 
@@ -54,6 +54,17 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
         onMessage: "npx buildsignal-cli buildsignal-hook",
         onToolCall: "npx buildsignal-cli buildsignal-hook",
       },
+    },
+    null,
+    2
+  );
+
+  const antigravityConfig = JSON.stringify(
+    {
+      name: "buildsignal-collector",
+      source: "antigravity",
+      command: "npx buildsignal-cli buildsignal-hook --source antigravity",
+      enabled: true,
     },
     null,
     2
@@ -129,7 +140,18 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
             }`}
           >
             <Terminal className="size-3.5" />
-            <span>Codex JSON</span>
+            <span>Codex</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("antigravity")}
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+              activeTab === "antigravity"
+                ? "apple-segmented-thumb-active"
+                : "text-[#6e6e73] dark:text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-white"
+            }`}
+          >
+            <Zap className="size-3.5 text-[#ff9f0a]" />
+            <span>Antigravity</span>
           </button>
         </div>
 
@@ -225,6 +247,39 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
                 className="apple-btn-secondary absolute right-3 top-3 py-1 px-3 text-xs"
               >
                 {copiedKey === "codex" ? (
+                  <>
+                    <Check className="size-3 text-[#30d158]" />
+                    <span>Copiado</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-3" />
+                    <span>Copiar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Antigravity Agent Harness */}
+        {activeTab === "antigravity" && (
+          <div className="space-y-4">
+            <div className="rounded-[16px] bg-black/[0.03] dark:bg-white/[0.04] p-4 text-xs text-[#6e6e73] dark:text-[#86868b] leading-relaxed border border-black/[0.05] dark:border-white/[0.06]">
+              Para probar con tu <span className="text-[#ff9f0a] font-semibold">harness de Antigravity</span> o registrar el hook en{" "}
+              <code className="font-mono text-[#ff9f0a] font-semibold">
+                ~/.gemini/antigravity-cli/hooks/
+              </code>
+              :
+            </div>
+
+            <div className="relative rounded-[16px] bg-[#121214] p-4 font-mono text-xs text-white border border-white/10">
+              <pre className="overflow-x-auto">{antigravityConfig}</pre>
+              <button
+                onClick={() => copyToClipboard(antigravityConfig, "antigravity")}
+                className="apple-btn-secondary absolute right-3 top-3 py-1 px-3 text-xs"
+              >
+                {copiedKey === "antigravity" ? (
                   <>
                     <Check className="size-3 text-[#30d158]" />
                     <span>Copiado</span>

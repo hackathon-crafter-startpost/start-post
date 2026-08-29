@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const EventSourceSchema = z.enum(["claude-code", "codex", "manual-demo"]);
+export const EventSourceSchema = z.enum(["claude-code", "codex", "antigravity", "manual-demo"]);
 export type EventSource = z.infer<typeof EventSourceSchema>;
 
 export const EventTypeSchema = z.enum([

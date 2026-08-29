@@ -314,6 +314,120 @@ function normalizeClaudeEvent(raw, installationId) {
   return sanitizeEvent(rawEvent);
 }
 
+function normalizeAntigravityEvent(raw, installationId) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const hasUserInput = raw.type === "USER_INPUT" || !!raw.user_input || !!raw.prompt || !!raw.message;
+  const hasToolCalls = Array.isArray(raw.tool_calls) && raw.tool_calls.length > 0;
+  const hasTool = !!(raw.tool || raw.toolName || raw.name || hasToolCalls);
+  const hasContent = !!raw.content;
+  const hasStatus = !!raw.status;
+
+  if (!hasUserInput && !hasTool && !hasContent && !hasStatus && !raw.type && !raw.summary) {
+    return null;
+  }
+
+  const explicitSessionId =
+    raw.conversation_id ||
+    raw.conversationId ||
+    raw.session_id ||
+    raw.sessionId ||
+    process.env.ANTIGRAVITY_CONVERSATION_ID ||
+    process.env.SESSION_ID;
+
+  const sessionId = explicitSessionId || getActiveSessionId(process.cwd());
+  let eventType = "tool_result";
+  let payload = {};
+
+  if (raw.type === "USER_INPUT" || (hasUserInput && !hasTool)) {
+    eventType = "user_prompt";
+    payload = {
+      prompt: raw.content || raw.user_input || raw.prompt || raw.message || "",
+    };
+  } else if (hasToolCalls) {
+    const firstTool = raw.tool_calls[0];
+    const toolName = firstTool.name || firstTool.tool || "";
+    const args = firstTool.args || firstTool.parameters || {};
+
+    if (toolName === "replace_file_content" || toolName === "write_to_file") {
+      eventType = "file_changed";
+      payload = {
+        tool: toolName,
+        filePath: args.TargetFile || args.path || args.file_path,
+        diff: args.TargetContent ? `-${args.TargetContent}\n+${args.ReplacementContent}` : undefined,
+        codeBefore: args.TargetContent,
+        codeAfter: args.ReplacementContent || args.CodeContent,
+      };
+    } else if (toolName === "run_command") {
+      const cmd = args.CommandLine || args.command || "";
+      const isTest =
+        cmd.includes("test") ||
+        cmd.includes("vitest") ||
+        cmd.includes("jest") ||
+        cmd.includes("pytest") ||
+        cmd.includes("cargo test") ||
+        cmd.includes("go test");
+
+      const exitCode = raw.status === "ERROR" || raw.exitCode === 1 ? 1 : 0;
+      eventType = isTest ? (exitCode === 0 ? "test_passed" : "test_failed") : "tool_result";
+      payload = {
+        tool: toolName,
+        command: cmd,
+        output: raw.content || raw.output || "",
+        exitCode,
+      };
+    } else {
+      eventType = "tool_result";
+      payload = {
+        tool: toolName,
+        args,
+        output: raw.content || "",
+      };
+    }
+  } else if (raw.type === "file_changed" || raw.filePath || raw.TargetFile) {
+    eventType = "file_changed";
+    payload = {
+      filePath: raw.filePath || raw.TargetFile || raw.path,
+      diff: raw.diff,
+      codeBefore: raw.codeBefore || raw.TargetContent,
+      codeAfter: raw.codeAfter || raw.ReplacementContent || raw.CodeContent,
+    };
+  } else if (raw.command || raw.CommandLine) {
+    const cmd = raw.command || raw.CommandLine || "";
+    const isTest =
+      cmd.includes("test") ||
+      cmd.includes("vitest") ||
+      cmd.includes("jest") ||
+      cmd.includes("pytest") ||
+      cmd.includes("cargo test") ||
+      cmd.includes("go test");
+
+    const exitCode = raw.exitCode ?? raw.exit_code ?? (raw.status === "ERROR" ? 1 : 0);
+    eventType = isTest ? (exitCode === 0 ? "test_passed" : "test_failed") : "tool_result";
+    payload = {
+      command: cmd,
+      exitCode,
+      output: raw.output || raw.content || "",
+    };
+  } else {
+    payload = { ...raw };
+  }
+
+  const rawEvent = {
+    eventId: generateEventId(),
+    sessionId,
+    installationId,
+    source: "antigravity",
+    type: eventType,
+    timestamp: Date.now(),
+    payload,
+    summary: raw.summary,
+    sanitized: false,
+  };
+
+  return sanitizeEvent(rawEvent);
+}
+
 class EventQueue {
   constructor() {
     const dir = path.join(os.homedir(), ".buildsignal");
@@ -337,6 +451,10 @@ async function main() {
   try {
     const rawInput = await readStdin(400);
     let payload = null;
+    const isAntigravity =
+      process.argv.includes("--source") && process.argv.includes("antigravity") ||
+      process.env.AGENT_FRAMEWORK === "antigravity" ||
+      process.env.ANTIGRAVITY_AGENT === "1";
 
     if (rawInput && rawInput.trim()) {
       try {
@@ -345,20 +463,27 @@ async function main() {
         payload = { message: rawInput.trim() };
       }
     } else if (process.argv.length > 2) {
-      payload = { message: process.argv.slice(2).join(" ") };
+      payload = { message: process.argv.slice(2).filter((a) => !a.startsWith("--")).join(" ") };
     }
 
     if (!payload) {
-      // Nothing to record - exit cleanly
       return;
     }
 
     const config = loadConfig();
     if (!config.enabled) return;
 
-    const event = normalizeClaudeEvent(payload, config.installationId);
+    const source =
+      payload.source === "antigravity" || isAntigravity || payload.type === "USER_INPUT" || payload.tool_calls
+        ? "antigravity"
+        : payload.source || "claude-code";
+
+    const event =
+      source === "antigravity"
+        ? normalizeAntigravityEvent(payload, config.installationId)
+        : normalizeClaudeEvent(payload, config.installationId);
+
     if (!event) {
-      // Empty / noise event - do not emit
       return;
     }
 
@@ -376,7 +501,7 @@ async function main() {
       body: JSON.stringify({
         installationId: config.installationId,
         sessionId: event.sessionId,
-        source: "claude-code",
+        source: event.source,
         events: [event],
       }),
     }).catch(() => {});
@@ -387,3 +512,4 @@ async function main() {
 }
 
 main();
+

@@ -111,6 +111,17 @@ export default defineSchema({
       accentColor: v.string(),
       authorName: v.optional(v.string()),
       category: v.optional(v.string()),
+      metrics: v.optional(
+        v.array(
+          v.object({
+            label: v.string(),
+            before: v.string(),
+            after: v.string(),
+          })
+        )
+      ),
+      diagramNodes: v.optional(v.array(v.string())),
+      visualBadge: v.optional(v.string()),
     }),
     status: v.string(), // "draft" | "edited" | "ready" | "published"
     bufferStatus: v.optional(v.string()), // "queued" | "published" | "failed"
