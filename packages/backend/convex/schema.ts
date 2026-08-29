@@ -19,7 +19,9 @@ export default defineSchema({
     deviceName: v.optional(v.string()),
     lastSeenAt: v.number(),
     enabled: v.boolean(),
-  }).index("by_token_hash", ["tokenHash"]),
+  })
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_user", ["userId"]),
 
   projects: defineTable({
     userId: v.optional(v.string()),
@@ -32,6 +34,7 @@ export default defineSchema({
     .index("by_repo_hash", ["repositoryHash"]),
 
   sessions: defineTable({
+    userId: v.optional(v.string()),
     projectId: v.optional(v.string()),
     installationId: v.string(),
     source: v.string(), // "claude-code" | "codex" | "manual-demo"
@@ -42,7 +45,8 @@ export default defineSchema({
     eventCount: v.optional(v.number()),
   })
     .index("by_installation", ["installationId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_user", ["userId"]),
 
   events: defineTable({
     sessionId: v.string(),
@@ -57,6 +61,7 @@ export default defineSchema({
     .index("by_event_id", ["eventId"]),
 
   moments: defineTable({
+    userId: v.optional(v.string()),
     sessionId: v.string(),
     category: v.string(), // "bug_fix" | "lesson" | "performance" | "architecture" | "automation"
     title: v.string(),
@@ -81,7 +86,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_session", ["sessionId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_user", ["userId"]),
 
   postDrafts: defineTable({
     momentId: v.id("moments"),

@@ -18,6 +18,7 @@
   "dependencies": {
     "@hackathon-craft-station/shared-types": "workspace:*",
     "clsx": "^2.1.1",
+    "html-to-image": "^1.11.11",
     "lucide-react": "^1.21.0"
   },
   "devDependencies": {

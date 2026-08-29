@@ -2,17 +2,16 @@
 /**
  * CLI script to simulate a live coding session sending events to BuildSignal
  */
-import { sendEventBatch } from "@hackathon-craft-station/collector";
+import { sendEventBatch, loadConfig } from "@hackathon-craft-station/collector";
 
-const CONVEX_SITE_URL =
-  process.env.CONVEX_SITE_URL || "https://clever-labrador-928.convex.site";
-
+const config = loadConfig();
 const sessionId = `cli_session_${Date.now()}`;
-const installationId = "cli_local_runner";
-const endpoint = `${CONVEX_SITE_URL}/api/events/ingest`;
+const installationId = config.installationId;
+const endpoint = config.endpointUrl;
 
 console.log("🚀 Iniciando simulación de sesión en vivo...");
 console.log(`🔗 Endpoint: ${endpoint}`);
+console.log(`🔑 Installation Token: ${installationId}`);
 console.log(`📦 Session ID: ${sessionId}`);
 
 const events = [
@@ -88,7 +87,7 @@ async function run() {
 
   if (result.success) {
     console.log(`✅ ¡Lote de ${result.ingestedCount} eventos enviado a Convex exitosamente!`);
-    console.log("✨ Abre el dashboard en http://localhost:3001 para ver el momento detectado.");
+    console.log("✨ Abre el dashboard para ver el momento y la historia detectada.");
   } else {
     console.error("❌ Error al enviar lote:", result.error);
   }

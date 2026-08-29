@@ -87,10 +87,12 @@ export const analyzeSession = mutation({
       .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
       .first();
 
+    const userId = existingMoment?.userId;
     let momentId = existingMoment?._id;
 
     if (existingMoment) {
       await ctx.db.patch(existingMoment._id, {
+        userId: userId || existingMoment.userId,
         category,
         title,
         problem,
@@ -105,6 +107,7 @@ export const analyzeSession = mutation({
       });
     } else {
       momentId = await ctx.db.insert("moments", {
+        userId,
         sessionId: args.sessionId,
         category,
         title,

@@ -24,14 +24,30 @@ export const ingestBatch = mutation({
   handler: async (ctx, args) => {
     let newEventsCount = 0;
 
-    // Ensure session exists or create it
-    const sessionByInstallation = await ctx.db
-      .query("sessions")
-      .withIndex("by_installation", (q) => q.eq("installationId", args.installationId))
+    // 1. Look up installation to link userId and update activity
+    const installation = await ctx.db
+      .query("installations")
+      .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.installationId))
       .first();
 
-    if (!sessionByInstallation) {
+    let userId: string | undefined = installation?.userId;
+
+    if (installation) {
+      await ctx.db.patch(installation._id, {
+        lastSeenAt: Date.now(),
+      });
+    }
+
+    // 2. Ensure session exists or create it
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_installation", (q) => q.eq("installationId", args.installationId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .first();
+
+    if (!session) {
       await ctx.db.insert("sessions", {
+        userId,
         installationId: args.installationId,
         source: args.source,
         status: "active",
@@ -39,10 +55,15 @@ export const ingestBatch = mutation({
         analysisStatus: "pending",
         eventCount: args.events.length,
       });
+    } else {
+      await ctx.db.patch(session._id, {
+        userId: userId || session.userId,
+        eventCount: (session.eventCount || 0) + args.events.length,
+      });
     }
 
+    // 3. Ingest events idempotently
     for (const evt of args.events) {
-      // Idempotency check: check if eventId already exists
       const existing = await ctx.db
         .query("events")
         .withIndex("by_event_id", (q) => q.eq("eventId", evt.eventId))

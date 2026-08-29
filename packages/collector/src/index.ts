@@ -377,3 +377,226 @@ export async function flushQueue(
 
   return { flushed: totalFlushed, errors: errorCount };
 }
+
+/* =========================================================================
+   CLI & Account Configuration Helpers
+========================================================================= */
+
+export interface BuildSignalConfig {
+  installationId: string;
+  endpointUrl: string;
+  enabled: boolean;
+  deviceName?: string;
+  userId?: string;
+  linkedAt?: string;
+  createdAt: string;
+}
+
+export function getConfigDir(): string {
+  return path.join(os.homedir(), ".buildsignal");
+}
+
+export function getConfigPath(): string {
+  return path.join(getConfigDir(), "config.json");
+}
+
+export function loadConfig(): BuildSignalConfig {
+  const dir = getConfigDir();
+  const file = getConfigPath();
+
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch {
+      // ignore
+    }
+  }
+
+  let config: BuildSignalConfig = {
+    installationId: `inst_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+    endpointUrl:
+      process.env.BUILDSIGNAL_ENDPOINT ||
+      process.env.CONVEX_SITE_URL ||
+      (process.env.NEXT_PUBLIC_CONVEX_URL
+        ? `${process.env.NEXT_PUBLIC_CONVEX_URL.replace(/\.cloud$/, ".site")}/api/events/ingest`
+        : "https://clever-labrador-928.convex.site/api/events/ingest"),
+    enabled: true,
+    deviceName: `${os.hostname()} (${os.platform()})`,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (fs.existsSync(file)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      config = { ...config, ...parsed };
+    } catch {
+      // keep fallback
+    }
+  } else {
+    try {
+      fs.writeFileSync(file, JSON.stringify(config, null, 2), "utf8");
+    } catch {
+      // ignore
+    }
+  }
+
+  if (process.env.BUILDSIGNAL_TOKEN) {
+    config.installationId = process.env.BUILDSIGNAL_TOKEN;
+  }
+  if (process.env.BUILDSIGNAL_ENDPOINT) {
+    config.endpointUrl = process.env.BUILDSIGNAL_ENDPOINT;
+  }
+
+  return config;
+}
+
+export function saveConfig(updates: Partial<BuildSignalConfig>): BuildSignalConfig {
+  const current = loadConfig();
+  const updated: BuildSignalConfig = {
+    ...current,
+    ...updates,
+  };
+
+  const dir = getConfigDir();
+  const file = getConfigPath();
+
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    fs.writeFileSync(file, JSON.stringify(updated, null, 2), "utf8");
+  } catch {
+    // ignore
+  }
+
+  return updated;
+}
+
+export async function linkAccountToken(options: {
+  token: string;
+  endpointUrl?: string;
+  deviceName?: string;
+}): Promise<{ success: boolean; installationId: string; error?: string }> {
+  const config = loadConfig();
+  const endpoint = options.endpointUrl || config.endpointUrl;
+  const deviceName = options.deviceName || config.deviceName || `${os.hostname()} (${os.platform()})`;
+
+  try {
+    const pingBatch: EventBatch = {
+      installationId: options.token,
+      sessionId: `ping_${Date.now()}`,
+      source: "claude-code",
+      events: [],
+    };
+
+    await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-buildsignal-installation": options.token,
+      },
+      body: JSON.stringify(pingBatch),
+    });
+
+    saveConfig({
+      installationId: options.token,
+      endpointUrl: endpoint,
+      deviceName,
+      linkedAt: new Date().toISOString(),
+    });
+
+    return {
+      success: true,
+      installationId: options.token,
+    };
+  } catch (err: any) {
+    saveConfig({
+      installationId: options.token,
+      endpointUrl: endpoint,
+      deviceName,
+      linkedAt: new Date().toISOString(),
+    });
+
+    return {
+      success: true,
+      installationId: options.token,
+      error: `Guardado en configuración local. Advertencia de conexión: ${err?.message}`,
+    };
+  }
+}
+
+export function installClaudeHooks(customHookPath?: string): { success: boolean; configPath: string } {
+  const claudeDir = path.join(os.homedir(), ".claude");
+  const claudeConfigPath = path.join(claudeDir, "config.json");
+
+  if (!fs.existsSync(claudeDir)) {
+    try {
+      fs.mkdirSync(claudeDir, { recursive: true });
+    } catch {
+      // ignore
+    }
+  }
+
+  let claudeConfig: any = {};
+  if (fs.existsSync(claudeConfigPath)) {
+    try {
+      claudeConfig = JSON.parse(fs.readFileSync(claudeConfigPath, "utf8"));
+    } catch {
+      claudeConfig = {};
+    }
+  }
+
+  const hookCmd = customHookPath
+    ? `node "${customHookPath}"`
+    : `node "${path.resolve(path.join(getConfigDir(), "hooks", "buildsignal-hook.mjs"))}"`;
+
+  claudeConfig.hooks = {
+    ...claudeConfig.hooks,
+    onUserPrompt: hookCmd,
+    onToolResult: hookCmd,
+    onTurnStop: hookCmd,
+  };
+
+  fs.writeFileSync(claudeConfigPath, JSON.stringify(claudeConfig, null, 2), "utf8");
+  return { success: true, configPath: claudeConfigPath };
+}
+
+export function installCodexHooks(customHookPath?: string): { success: boolean; configPath: string } {
+  const codexDir = path.join(os.homedir(), ".codex");
+  const codexConfigPath = path.join(codexDir, "config.json");
+
+  if (!fs.existsSync(codexDir)) {
+    try {
+      fs.mkdirSync(codexDir, { recursive: true });
+    } catch {
+      // ignore
+    }
+  }
+
+  let codexConfig: any = {};
+  if (fs.existsSync(codexConfigPath)) {
+    try {
+      codexConfig = JSON.parse(fs.readFileSync(codexConfigPath, "utf8"));
+    } catch {
+      codexConfig = {};
+    }
+  }
+
+  const hookCmd = customHookPath
+    ? `node "${customHookPath}"`
+    : `node "${path.resolve(path.join(getConfigDir(), "hooks", "codex-hook.mjs"))}"`;
+
+  codexConfig.hooks = {
+    ...codexConfig.hooks,
+    onMessage: hookCmd,
+    onToolCall: hookCmd,
+  };
+
+  fs.writeFileSync(codexConfigPath, JSON.stringify(codexConfig, null, 2), "utf8");
+  return { success: true, configPath: codexConfigPath };
+}

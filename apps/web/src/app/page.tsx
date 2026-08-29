@@ -1,3 +1,4 @@
+/* Hallmark · Apple Design Authority & Creation Studio */
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -8,7 +9,6 @@ import type { ImageManifest } from "@hackathon-craft-station/shared-types";
 import { toBlob } from "html-to-image";
 import { toast } from "sonner";
 import {
-  Sparkles,
   Copy,
   Download,
   Check,
@@ -30,6 +30,8 @@ import {
   RefreshCw,
   ArrowLeft,
   SlidersHorizontal,
+  Sparkles,
+  Play,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -48,7 +50,7 @@ export default function DashboardPage() {
 
   // Visual card customizer state (Apple HIG Palette)
   const [customAuthor, setCustomAuthor] = useState("Diego");
-  const [customAccent, setCustomAccent] = useState("#0071e3");
+  const [customAccent, setCustomAccent] = useState("#0066cc");
   const [customTemplate, setCustomTemplate] = useState<"bug-fix" | "lesson" | "before-after">("bug-fix");
   const [copied, setCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -64,16 +66,16 @@ export default function DashboardPage() {
     if (!activeMoment?.sessionId) return;
     try {
       setIsGeneratingAi(true);
-      toast.info("Generando publicación y narrativa con Gemini 2.5 Flash...");
+      toast.info("Sintetizando narrativa técnica con Gemini 2.5 Flash...");
       const res = await analyzeWithGemini({ sessionId: activeMoment.sessionId });
-      toast.success("¡Contenido generado exitosamente con Gemini AI!", {
+      toast.success("¡Síntesis completada con éxito!", {
         description:
           res.source === "gemini_ai"
-            ? "Historia, tarjeta y video HyperFrames sintetizados con IA."
+            ? "Narrativa, tarjeta 1080x1350 y video HyperFrames sincronizados."
             : "Análisis completado.",
       });
     } catch (err: any) {
-      toast.error("Error al generar con Gemini: " + (err?.message || ""));
+      toast.error("Error al sintetizar: " + (err?.message || ""));
     } finally {
       setIsGeneratingAi(false);
     }
@@ -148,7 +150,7 @@ export default function DashboardPage() {
   const handleDownloadPNG = async () => {
     const cardEl = document.getElementById("social-post-card");
     if (!cardEl) {
-      toast.error("No se encontró el elemento visual");
+      toast.error("No se encontró el elemento visual de la tarjeta");
       return;
     }
 
@@ -159,7 +161,7 @@ export default function DashboardPage() {
       const blob = await toBlob(cardEl, {
         pixelRatio: 2,
         quality: 0.95,
-        backgroundColor: "#272729",
+        backgroundColor: "#18181b",
       });
 
       if (!blob) throw new Error("No se pudo generar la imagen");
@@ -238,7 +240,7 @@ export default function DashboardPage() {
     problem: activeMoment?.problem || "Problema observado durante la sesión.",
     codeBefore: activeMoment?.postDraft?.imageManifest?.codeBefore,
     codeAfter: activeMoment?.postDraft?.imageManifest?.codeAfter,
-    result: activeMoment?.postDraft?.imageManifest?.result || "12/12 tests aprobados",
+    result: activeMoment?.postDraft?.imageManifest?.result || "Tests 100% Passing",
     takeaway: activeMoment?.lesson || "Lección aprendida en la sesión.",
     accentColor: customAccent,
     authorName: customAuthor,
@@ -249,22 +251,21 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#f5f5f7] dark:bg-[#000000] text-[#1d1d1f] dark:text-[#f5f5f7] transition-colors duration-300 pb-32">
       {/* Apple Hero Showcase Tile */}
       <section className="relative pt-12 sm:pt-16 pb-10 sm:pb-14 border-b border-black/[0.06] dark:border-white/[0.08] overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-gradient-to-b from-[#0071e3]/12 to-transparent blur-3xl pointer-events-none rounded-full" />
-
         <div className="container mx-auto px-4 sm:px-8 relative z-10">
           <div className="max-w-3xl">
-            {/* Pill Eyebrow */}
-            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full apple-acrylic-bar text-[12px] font-medium text-[#0071e3] dark:text-[#2997ff] mb-4">
-              <Sparkles className="size-3.5" />
+            {/* Apple Frosted Pill Eyebrow */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full apple-acrylic-bar text-[12px] font-medium text-[#0066cc] dark:text-[#2997ff] mb-4 shadow-sm">
+              <span className="size-2 rounded-full bg-[#30d158] animate-pulse" />
               <span>Observabilidad Creativa • HyperFrames & Gemini 2.5 AI</span>
             </div>
 
+            {/* SF Pro Display Hero Headline (Apple 56px tight tracking) */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-[-0.03em] text-[#1d1d1f] dark:text-white leading-[1.15]">
               Transforma tu código real en contenido interactivo y tarjetas de alto impacto.
             </h1>
 
             <p className="text-[15px] sm:text-[17px] text-[#6e6e73] dark:text-[#86868b] mt-3.5 leading-relaxed font-normal">
-              Captura pasiva con Claude Code y Codex. Detección determinista de valor, síntesis narrativa con Google Gemini y generación de video interactivo con HyperFrames.
+              Captura pasiva con Claude Code y Codex. Detección determinista de valor educativo, síntesis narrativa con Google Gemini y generación de video interactivo con HyperFrames.
             </p>
 
             {/* Top Action Pills */}
@@ -273,7 +274,7 @@ export default function DashboardPage() {
                 href="/dashboard"
                 className="apple-btn-secondary text-[14px]"
               >
-                <Activity className="size-3.5" />
+                <Activity className="size-3.5 text-[#0066cc] dark:text-[#2997ff]" />
                 <span>Telemetría en Vivo</span>
               </Link>
             </div>
@@ -283,7 +284,7 @@ export default function DashboardPage() {
 
       {/* Main Studio Container */}
       <main className="container mx-auto px-4 sm:px-8 pt-8 sm:pt-10">
-        {/* Metric Bar: 4 Apple Acrylic Glass Cards */}
+        {/* Metric Bar: 4 Apple Acrylic Glass Cards (VisionOS Style) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8 sm:mb-10">
           <div className="apple-acrylic-card p-4 sm:p-5">
             <span className="text-[11px] sm:text-[12px] font-medium uppercase tracking-wider text-[#6e6e73] dark:text-[#86868b]">
@@ -304,7 +305,7 @@ export default function DashboardPage() {
             <div className="text-xl sm:text-2xl font-semibold text-[#1d1d1f] dark:text-white mt-1">
               88/100
             </div>
-            <span className="text-[10px] sm:text-[11px] text-[#0071e3] dark:text-[#2997ff] font-medium mt-1 inline-block">
+            <span className="text-[10px] sm:text-[11px] text-[#0066cc] dark:text-[#2997ff] font-medium mt-1 inline-block">
               Umbral &gt; 70 superado
             </span>
           </div>
@@ -326,7 +327,7 @@ export default function DashboardPage() {
             <span className="text-[11px] sm:text-[12px] font-medium uppercase tracking-wider text-[#6e6e73] dark:text-[#86868b]">
               HyperFrames & IA
             </span>
-            <div className="text-xl sm:text-2xl font-semibold text-[#0071e3] dark:text-[#2997ff] mt-1">
+            <div className="text-xl sm:text-2xl font-semibold text-[#0066cc] dark:text-[#2997ff] mt-1">
               Activo
             </div>
             <span className="text-[10px] sm:text-[11px] text-[#6e6e73] dark:text-[#86868b] mt-1 inline-block">
@@ -353,11 +354,10 @@ export default function DashboardPage() {
                 onClick={() => setMobileSection("studio")}
                 className={`py-2 text-xs font-semibold rounded-full transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   mobileSection === "studio"
-                    ? "apple-segmented-thumb-active text-[#0071e3] dark:text-[#2997ff]"
+                    ? "apple-segmented-thumb-active text-[#0066cc] dark:text-[#2997ff]"
                     : "text-[#6e6e73] dark:text-[#86868b]"
                 }`}
               >
-                <Sparkles className="size-3" />
                 <span>Estudio de Creación</span>
               </button>
             </div>
@@ -365,13 +365,13 @@ export default function DashboardPage() {
         )}
 
         {/* Studio Workspace Layout */}
-        {(!moments || moments.length === 0) ? (
+        {!moments || moments.length === 0 ? (
           /* Apple Empty State */
           <div className="apple-acrylic-card p-8 sm:p-12 text-center flex flex-col items-center justify-center max-w-2xl mx-auto my-8 sm:my-12">
-            <div className="size-14 sm:size-16 rounded-full bg-[#0071e3]/10 text-[#0071e3] dark:text-[#2997ff] flex items-center justify-center mb-5">
+            <div className="size-14 sm:size-16 rounded-full bg-[#0066cc]/10 text-[#0066cc] dark:text-[#2997ff] flex items-center justify-center mb-5">
               <Terminal className="size-7 sm:size-8" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-semibold text-[#1d1d1f] dark:text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-semibold text-[#1d1d1f] dark:text-white tracking-tight font-sans">
               Esperando Eventos de tu Agente
             </h2>
             <p className="text-[#6e6e73] dark:text-[#86868b] text-[14px] sm:text-[15px] mt-2 max-w-md">
@@ -379,7 +379,7 @@ export default function DashboardPage() {
             </p>
             <div className="mt-6 p-4 rounded-[16px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-xs text-left max-w-md w-full">
               <div className="text-[#6e6e73] dark:text-[#86868b] mb-1.5"># Para enviar una prueba simulada desde tu terminal:</div>
-              <div className="text-[#0071e3] dark:text-[#2997ff] font-semibold">pnpm buildsignal simulate</div>
+              <div className="text-[#0066cc] dark:text-[#2997ff] font-semibold">pnpm buildsignal simulate</div>
             </div>
           </div>
         ) : (
@@ -433,7 +433,7 @@ export default function DashboardPage() {
                       onClick={() => handleSelectMoment(m._id)}
                       className={`apple-acrylic-card p-4 sm:p-5 transition-all cursor-pointer ${
                         isSelected
-                          ? "ring-2 ring-[#0071e3] dark:ring-[#2997ff] scale-[1.01]"
+                          ? "ring-2 ring-[#0066cc] dark:ring-[#2997ff] scale-[1.01]"
                           : "hover:scale-[1.005]"
                       }`}
                     >
@@ -442,7 +442,7 @@ export default function DashboardPage() {
                           <span
                             className={`px-2.5 sm:px-3 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase ${
                               isHighValue
-                                ? "bg-[#0071e3] text-white"
+                                ? "bg-[#0066cc] text-white"
                                 : "bg-black/5 dark:bg-white/10 text-[#6e6e73] dark:text-white"
                             }`}
                           >
@@ -458,12 +458,12 @@ export default function DashboardPage() {
 
                         {/* Value Score Pill */}
                         <div className="flex items-center gap-1 px-2.5 sm:px-3 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-[11px] sm:text-[12px] font-semibold text-[#1d1d1f] dark:text-white">
-                          <Flame className="size-3 text-[#0071e3] dark:text-[#2997ff]" />
+                          <Flame className="size-3 text-[#0066cc] dark:text-[#2997ff]" />
                           <span>{m.score}/100</span>
                         </div>
                       </div>
 
-                      <h3 className="font-semibold text-[15px] sm:text-[17px] text-[#1d1d1f] dark:text-white mt-2.5 leading-snug tracking-tight">
+                      <h3 className="font-semibold text-[15px] sm:text-[17px] text-[#1d1d1f] dark:text-white mt-2.5 leading-snug tracking-tight font-sans">
                         {m.title}
                       </h3>
 
@@ -511,14 +511,14 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] sm:text-[12px] font-semibold uppercase text-[#0071e3] dark:text-[#2997ff]">
+                          <span className="text-[11px] sm:text-[12px] font-semibold uppercase text-[#0066cc] dark:text-[#2997ff]">
                             Estudio de Creación
                           </span>
                           <span className="text-[10px] sm:text-[11px] font-mono bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full text-[#6e6e73] dark:text-[#86868b]">
                             ID: {activeMoment._id.slice(0, 8)}
                           </span>
                         </div>
-                        <h2 className="text-[18px] sm:text-[22px] font-semibold text-[#1d1d1f] dark:text-white mt-1 line-clamp-1 tracking-tight">
+                        <h2 className="text-[18px] sm:text-[22px] font-semibold text-[#1d1d1f] dark:text-white mt-1 line-clamp-1 tracking-tight font-sans">
                           {activeMoment.title}
                         </h2>
                       </div>
@@ -602,10 +602,10 @@ export default function DashboardPage() {
                                 onClick={handleGenerateWithGemini}
                                 disabled={isGeneratingAi}
                                 className="apple-btn-secondary text-[12px] sm:text-[13px] py-1.5 px-3 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[36px]"
-                                title="Sintetizar y optimizar la narrativa con Google Gemini 2.5 AI"
+                                title="Sintetizar y optimizar la narrativa con Google Gemini 2.5 Flash"
                               >
-                                <Sparkles className={`size-3.5 text-[#0071e3] dark:text-[#2997ff] ${isGeneratingAi ? "animate-spin" : ""}`} />
-                                <span>{isGeneratingAi ? "Generando..." : "Gemini AI"}</span>
+                                <Zap className={`size-3.5 text-[#0066cc] dark:text-[#2997ff] ${isGeneratingAi ? "animate-spin" : ""}`} />
+                                <span>{isGeneratingAi ? "Sintetizando..." : "Gemini 2.5"}</span>
                               </button>
                               <button
                                 onClick={handleStartEdit}
@@ -626,7 +626,7 @@ export default function DashboardPage() {
                                 ) : (
                                   <>
                                     <Copy className="size-3.5" />
-                                    <span>Copiar</span>
+                                    <span>Copiar Post</span>
                                   </>
                                 )}
                               </button>
@@ -657,20 +657,20 @@ export default function DashboardPage() {
                               rows={10}
                               value={editedBody}
                               onChange={(e) => setEditedBody(e.target.value)}
-                              className="w-full mt-1 p-3.5 rounded-[16px] bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] text-xs sm:text-sm text-[#1d1d1f] dark:text-white leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                              className="w-full mt-1 p-3.5 rounded-[16px] bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] text-xs sm:text-sm text-[#1d1d1f] dark:text-white leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#0066cc]"
                             />
                           </div>
                         </div>
                       ) : (
                         <div className="p-4 sm:p-6 rounded-[18px] sm:rounded-[20px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/[0.06] text-[14px] sm:text-[15px] leading-relaxed flex flex-col gap-4 text-[#1d1d1f] dark:text-white">
-                          <p className="font-semibold text-[#0071e3] dark:text-[#2997ff] text-[15px] sm:text-[16px]">
+                          <p className="font-semibold text-[#0066cc] dark:text-[#2997ff] text-[15px] sm:text-[16px]">
                             {activeMoment.postDraft?.hook || "¿Te ha pasado esto al programar? 👇"}
                           </p>
                           <div className="whitespace-pre-line text-[#3a3a3c] dark:text-[#d1d1d6] text-xs sm:text-sm leading-relaxed">
                             {activeMoment.postDraft?.body || activeMoment.problem}
                           </div>
                           {activeMoment.postDraft?.hashtags && (
-                            <div className="flex flex-wrap gap-1.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] text-[11px] sm:text-xs font-mono text-[#0071e3] dark:text-[#2997ff]">
+                            <div className="flex flex-wrap gap-1.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] text-[11px] sm:text-xs font-mono text-[#0066cc] dark:text-[#2997ff]">
                               {activeMoment.postDraft.hashtags.map((tag, i) => (
                                 <span key={i}>{tag}</span>
                               ))}
@@ -699,7 +699,7 @@ export default function DashboardPage() {
                           disabled={isGeneratingAi}
                           className="apple-btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 min-h-[34px]"
                         >
-                          <Sparkles className="size-3.5 text-[#0071e3] dark:text-[#2997ff]" />
+                          <Zap className="size-3.5 text-[#0066cc] dark:text-[#2997ff]" />
                           <span>Re-sintetizar con Gemini</span>
                         </button>
                       </div>
@@ -723,7 +723,7 @@ export default function DashboardPage() {
                           <span className="text-[11px] font-medium text-[#6e6e73] dark:text-[#86868b]">
                             Color:
                           </span>
-                          {["#0071e3", "#30d158", "#ff9f0a", "#bf5af2", "#ff375f"].map((c) => (
+                          {["#0066cc", "#30d158", "#ff9f0a", "#bf5af2", "#ff375f"].map((c) => (
                             <button
                               key={c}
                               onClick={() => setCustomAccent(c)}

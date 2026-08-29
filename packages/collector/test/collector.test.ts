@@ -125,4 +125,33 @@ describe("Collector Engine", () => {
     expect(result.success).toBe(true);
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("manages local configuration and links account token", async () => {
+    const { loadConfig, saveConfig, linkAccountToken } = await import("../src/index");
+    
+    const initial = loadConfig();
+    expect(initial.installationId).toBeDefined();
+    expect(initial.endpointUrl).toBeDefined();
+
+    const saved = saveConfig({
+      installationId: "bs_tok_test_12345",
+      deviceName: "MacBook Pro M3",
+    });
+    expect(saved.installationId).toBe("bs_tok_test_12345");
+    expect(saved.deviceName).toBe("MacBook Pro M3");
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    global.fetch = mockFetch;
+
+    const linkRes = await linkAccountToken({
+      token: "bs_tok_verified_999",
+      deviceName: "Linux Workstation",
+    });
+
+    expect(linkRes.success).toBe(true);
+    expect(linkRes.installationId).toBe("bs_tok_verified_999");
+  });
 });

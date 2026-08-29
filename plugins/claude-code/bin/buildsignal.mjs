@@ -2,48 +2,102 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import readline from "readline";
 import {
   EventQueue,
   flushQueue,
-  normalizeClaudeEvent,
+  loadConfig,
+  saveConfig,
+  linkAccountToken,
+  installClaudeHooks,
+  installCodexHooks,
   sendEventBatch,
 } from "@hackathon-craft-station/collector";
 import { sanitizeText } from "@hackathon-craft-station/sanitizer";
 
 const command = process.argv[2] || "status";
+const param = process.argv[3];
 
-const CONVEX_SITE_URL =
-  process.env.CONVEX_SITE_URL ||
-  process.env.NEXT_PUBLIC_CONVEX_URL?.replace(/\.cloud$/, ".site") ||
-  "https://clever-labrador-928.convex.site";
+async function handleLink(tokenArg) {
+  let token = tokenArg;
 
-const ENDPOINT_URL = `${CONVEX_SITE_URL}/api/events/ingest`;
-const BUILDSIGNAL_DIR = path.join(os.homedir(), ".buildsignal");
-const CONFIG_PATH = path.join(BUILDSIGNAL_DIR, "config.json");
+  if (!token) {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
 
-function getOrInitConfig() {
-  if (!fs.existsSync(BUILDSIGNAL_DIR)) {
-    fs.mkdirSync(BUILDSIGNAL_DIR, { recursive: true });
+    token = await new Promise((resolve) => {
+      rl.question("\n🔑 Pega tu Token de Instalación de BuildSignal: ", (ans) => {
+        rl.close();
+        resolve(ans.trim());
+      });
+    });
   }
 
-  let config = {
-    installationId: `inst_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-    endpointUrl: ENDPOINT_URL,
-    enabled: true,
-    createdAt: new Date().toISOString(),
-  };
+  if (!token) {
+    console.log("\n❌ Error: Debes proporcionar un token. Ejemplo: buildsignal link bs_tok_xxxx\n");
+    return;
+  }
 
-  if (fs.existsSync(CONFIG_PATH)) {
-    try {
-      config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
-    } catch {
-      // keep default
-    }
+  console.log(`\n[BuildSignal] Vinculando dispositivo con el token: ${token.slice(0, 10)}...`);
+  const result = await linkAccountToken({
+    token,
+    deviceName: `${os.hostname()} (${os.platform()})`,
+  });
+
+  if (result.success) {
+    console.log("\n✅ ¡Dispositivo vinculado exitosamente a tu cuenta de BuildSignal!");
+    console.log(`   Token de sesión : ${result.installationId}`);
+    console.log(`   Dispositivo     : ${os.hostname()} (${os.platform()})`);
+    console.log("   Tus agentes (Claude Code / Codex) enviarán eventos a tu dashboard personal.\n");
   } else {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+    console.log(`\n⚠️ ${result.error || "No se pudo verificar el token online, pero se guardó localmente."}\n`);
   }
+}
 
-  return config;
+async function handleLogin() {
+  console.log("\n=======================================================");
+  console.log("             BuildSignal — Conectar Cuenta");
+  console.log("=======================================================\n");
+
+  const config = loadConfig();
+  const webBaseUrl = config.endpointUrl.includes("localhost")
+    ? "http://localhost:3000"
+    : config.endpointUrl.replace(/\/api\/events\/ingest$/, "").replace(/\.site$/, ".cloud");
+
+  console.log("1. Abre tu navegador e inicia sesión en BuildSignal:");
+  console.log(`   👉 ${webBaseUrl}/connect\n`);
+  console.log("2. Copia tu Token de Instalación único y pégalo a continuación.\n");
+
+  await handleLink();
+}
+
+async function handleWhoami() {
+  const config = loadConfig();
+  console.log("\n=======================================================");
+  console.log("             BuildSignal — Información de Cuenta");
+  console.log("=======================================================\n");
+
+  const isLinked = config.installationId.startsWith("bs_tok_");
+  console.log(`Estado de vinculación : ${isLinked ? "✅ VINCULADO A TU CUENTA" : "⚡ MODO LOCAL / ANÓNIMO"}`);
+  console.log(`Token / ID Instalación: ${config.installationId}`);
+  console.log(`Nombre de dispositivo : ${config.deviceName || os.hostname()}`);
+  console.log(`Endpoint de Convex    : ${config.endpointUrl}`);
+  if (config.linkedAt) {
+    console.log(`Fecha de vinculación  : ${new Date(config.linkedAt).toLocaleString()}`);
+  }
+  console.log("\n=======================================================\n");
+}
+
+async function handleUnlink() {
+  const newLocalId = `inst_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  saveConfig({
+    installationId: newLocalId,
+    linkedAt: undefined,
+  });
+  console.log("\n✅ Dispositivo desvinculado de la cuenta remota.");
+  console.log(`   Nuevo ID anónimo local: ${newLocalId}\n`);
 }
 
 async function handleStatus() {
@@ -51,24 +105,28 @@ async function handleStatus() {
   console.log("             BuildSignal CLI Diagnostics");
   console.log("=======================================================\n");
 
-  const config = getOrInitConfig();
+  const config = loadConfig();
+  const isLinked = config.installationId.startsWith("bs_tok_");
+  console.log(`[Cuenta] Estado          : ${isLinked ? "CONECTADO A CUENTA PERSONAL" : "LOCAL / DEV"}`);
   console.log(`[Config] Installation ID : ${config.installationId}`);
+  console.log(`[Config] Dispositivo     : ${config.deviceName || os.hostname()}`);
   console.log(`[Config] Endpoint        : ${config.endpointUrl}`);
-  console.log(`[Config] Enabled         : ${config.enabled ? "YES (Active)" : "NO (Disabled)"}`);
+  console.log(`[Config] Habilitado      : ${config.enabled ? "SÍ (Activo)" : "NO (Desactivado)"}`);
 
   // Check queue
   const queue = new EventQueue();
   const pending = await queue.peekBatch(100);
-  console.log(`[Queue]  Offline events  : ${pending.length} event(s) pending in ~/.buildsignal/queue.jsonl`);
+  console.log(`[Queue]  Offline events  : ${pending.length} evento(s) pendiente(s) en ~/.buildsignal/queue.jsonl`);
 
   // Test Zero-Leak Sanitizer
   const testSecret = "sk-ant-api03-abcdef1234567890abcdef1234567890";
   const sanitized = sanitizeText(`Mi token secreto es ${testSecret}`);
   const isSanitizing = !sanitized.includes("sk-ant-api03");
-  console.log(`[Priv]   Zero-Leak Engine: ${isSanitizing ? "OK (Secret redaction active)" : "FAIL"}`);
+  console.log(`[Priv]   Zero-Leak Engine: ${isSanitizing ? "OK (Redacción activa de secretos)" : "FAIL"}`);
 
   // Test Convex HTTP Action connectivity
   try {
+    const startTime = Date.now();
     const testBatch = {
       installationId: config.installationId,
       sessionId: "health_check_session",
@@ -77,11 +135,15 @@ async function handleStatus() {
     };
     const res = await fetch(config.endpointUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-buildsignal-installation": config.installationId,
+      },
       body: JSON.stringify(testBatch),
     });
+    const latency = Date.now() - startTime;
     if (res.ok) {
-      console.log(`[Convex] Ingest Endpoint : ONLINE (HTTP ${res.status})`);
+      console.log(`[Convex] Ingest Endpoint : ONLINE (${latency}ms, HTTP ${res.status})`);
     } else {
       console.log(`[Convex] Ingest Endpoint : WARNING (HTTP ${res.status})`);
     }
@@ -92,52 +154,35 @@ async function handleStatus() {
   console.log("\n=======================================================\n");
 }
 
-async function handleInstall() {
-  console.log("\n[BuildSignal] Instalando configuración de hooks para Claude Code...");
-  const config = getOrInitConfig();
-  const claudeDir = path.join(os.homedir(), ".claude");
-  const claudeConfigPath = path.join(claudeDir, "config.json");
+async function handleInstall(target = "all") {
+  console.log("\n[BuildSignal] Instalando configuración de hooks...");
+  const scriptDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"));
+  const claudeHookPath = path.resolve(scriptDir, "buildsignal-hook.mjs");
+  const codexHookPath = path.resolve(scriptDir, "../../codex/bin/codex-hook.mjs");
 
-  if (!fs.existsSync(claudeDir)) {
-    fs.mkdirSync(claudeDir, { recursive: true });
+  if (target === "all" || target === "claude") {
+    const res = installClaudeHooks(claudeHookPath);
+    console.log(`✅ Claude Code hooks configurados en: ${res.configPath}`);
   }
 
-  let claudeConfig = {};
-  if (fs.existsSync(claudeConfigPath)) {
-    try {
-      claudeConfig = JSON.parse(fs.readFileSync(claudeConfigPath, "utf8"));
-    } catch {
-      claudeConfig = {};
-    }
+  if (target === "all" || target === "codex") {
+    const res = installCodexHooks(codexHookPath);
+    console.log(`✅ OpenAI Codex hooks configurados en: ${res.configPath}`);
   }
 
-  const hookScriptPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")),
-    "buildsignal-hook.mjs"
-  );
-
-  claudeConfig.hooks = {
-    ...claudeConfig.hooks,
-    onUserPrompt: `node "${hookScriptPath}"`,
-    onToolResult: `node "${hookScriptPath}"`,
-    onTurnStop: `node "${hookScriptPath}"`,
-  };
-
-  fs.writeFileSync(claudeConfigPath, JSON.stringify(claudeConfig, null, 2), "utf8");
-  console.log(`[BuildSignal] Configuración escrita exitosamente en: ${claudeConfigPath}`);
-  console.log("[BuildSignal] Los hooks de Claude Code ahora reportarán eventos a BuildSignal con Zero-Leak activado.\n");
+  console.log("\n🚀 ¡Listo! Tus sesiones de Claude Code y Codex reportarán eventos automáticamente con Zero-Leak.\n");
 }
 
 async function handleFlush() {
   console.log("\n[BuildSignal] Drenando cola de eventos offline hacia Convex...");
-  const config = getOrInitConfig();
+  const config = loadConfig();
   const res = await flushQueue(config.endpointUrl, config.installationId, "claude-code");
   console.log(`[BuildSignal] Drenados ${res.flushed} evento(s) con ${res.errors} error(es).\n`);
 }
 
 async function handleSimulate() {
   console.log("\n[BuildSignal] Enviando sesión de prueba simulada...");
-  const config = getOrInitConfig();
+  const config = loadConfig();
   const sessionId = `sess_sim_${Date.now()}`;
 
   const sampleEvents = [
@@ -148,7 +193,7 @@ async function handleSimulate() {
       source: "claude-code",
       type: "user_prompt",
       timestamp: Date.now() - 30000,
-      payload: { prompt: "Arreglar error de falsos positivos en Web Audio API" },
+      payload: { prompt: "Corregir distorsión espectral en AnalyserNode Web Audio API" },
       sanitized: true,
     },
     {
@@ -158,7 +203,11 @@ async function handleSimulate() {
       source: "claude-code",
       type: "test_failed",
       timestamp: Date.now() - 20000,
-      payload: { command: "pnpm test", exitCode: 1, output: "FAIL: 40% false positives in audio analyzer" },
+      payload: {
+        command: "pnpm test",
+        exitCode: 1,
+        output: "FAIL: 40% false positives in audio analyzer spectrum",
+      },
       sanitized: true,
     },
     {
@@ -171,8 +220,8 @@ async function handleSimulate() {
       payload: {
         filePath: "src/audio-detector.ts",
         diff: "- analyser.smoothingTimeConstant = 0.8;\n+ analyser.smoothingTimeConstant = 0.0;",
-        codeBefore: "analyser.smoothingTimeConstant = 0.8;",
-        codeAfter: "analyser.smoothingTimeConstant = 0.0;",
+        codeBefore: "analyser.smoothingTimeConstant = 0.8; // Web Audio default",
+        codeAfter: "analyser.smoothingTimeConstant = 0.0; // Desactivado para transitorios",
       },
       sanitized: true,
     },
@@ -183,7 +232,11 @@ async function handleSimulate() {
       source: "claude-code",
       type: "test_passed",
       timestamp: Date.now(),
-      payload: { command: "pnpm test", exitCode: 0, output: "PASS: 12/12 tests passed with 0.0% false positives" },
+      payload: {
+        command: "pnpm test",
+        exitCode: 0,
+        output: "PASS: 12/12 tests passed with 0.0% false positives",
+      },
       sanitized: true,
     },
   ];
@@ -197,33 +250,62 @@ async function handleSimulate() {
   });
 
   if (res.success) {
-    console.log(`[BuildSignal] ¡Sesión ${sessionId} enviada exitosamente a Convex!`);
-    console.log(`[BuildSignal] Revisa el Dashboard en tiempo real en: http://localhost:3001/\n`);
+    console.log(`\n🎉 ¡Sesión ${sessionId} enviada exitosamente a Convex!`);
+    console.log(`   Token de usuario : ${config.installationId}`);
+    console.log(`   Abre el Estudio de Creación para ver el momento detectado:`);
+    console.log(`   👉 http://localhost:3000/ o la URL deployada\n`);
   } else {
-    console.error(`[BuildSignal] Error al enviar sesión: ${res.error}\n`);
+    console.error(`\n❌ Error al enviar sesión: ${res.error}\n`);
   }
 }
 
 function handleHelp() {
   console.log(`
-Uso: buildsignal <comando>
+BuildSignal CLI — Copiloto de Contenido Técnico para Desarrolladores
 
-Comandos disponibles:
-  status     Muestra el estado de la configuración, la cola local y la conexión a Convex.
-  install    Configura automáticamente los hooks en ~/.claude/config.json.
-  flush      Envía todos los eventos pendientes en la cola local a Convex.
-  simulate   Envía una sesión de prueba con un bug resuelto y tests aprobados.
-  help       Muestra este manual de ayuda.
+Uso:
+  buildsignal <comando> [argumentos]
+
+Comandos principales:
+  link <token>   Vincula tu terminal con tu cuenta de BuildSignal.
+  login          Inicia el flujo de conexión en el navegador.
+  install [all]  Instala automáticamente los hooks en Claude Code y Codex.
+  whoami         Muestra el estado de tu cuenta vinculada y dispositivo.
+  status         Ejecuta diagnósticos del sistema, cola offline y Zero-Leak.
+  simulate       Envía una sesión de prueba verificada para comprobar la conexión.
+  flush          Drena la cola de eventos locales pendientes a Convex.
+  unlink         Desvincula el dispositivo y regresa a modo anónimo.
+  help           Muestra esta ayuda.
+
+Ejemplos:
+  npx buildsignal link bs_tok_abc12345
+  npx buildsignal install
+  npx buildsignal simulate
+  npx buildsignal status
   `);
 }
 
 async function run() {
   switch (command) {
-    case "status":
-      await handleStatus();
+    case "link":
+      await handleLink(param);
+      break;
+    case "login":
+      await handleLogin();
+      break;
+    case "whoami":
+      await handleWhoami();
+      break;
+    case "unlink":
+    case "logout":
+      await handleUnlink();
       break;
     case "install":
-      await handleInstall();
+    case "setup":
+      await handleInstall(param);
+      break;
+    case "status":
+      await handleStatus();
       break;
     case "flush":
       await handleFlush();

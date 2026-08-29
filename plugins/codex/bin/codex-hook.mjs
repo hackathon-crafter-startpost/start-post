@@ -1,5 +1,11 @@
 #!/usr/bin/env node
-import { readStdin, normalizeCodexEvent, EventQueue, sendEventBatch } from "@hackathon-craft-station/collector";
+import {
+  readStdin,
+  normalizeCodexEvent,
+  EventQueue,
+  sendEventBatch,
+  loadConfig,
+} from "@hackathon-craft-station/collector";
 
 async function main() {
   try {
@@ -16,9 +22,13 @@ async function main() {
       payload = { user_input: process.argv.slice(2).join(" ") };
     }
 
-    const installationId = process.env.BUILDSIGNAL_INSTALLATION_ID || "inst_codex_local";
-    const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL || "https://clever-labrador-928.convex.site";
-    const endpoint = `${convexUrl.replace(/\.cloud$/, ".site")}/api/events/ingest`;
+    const config = loadConfig();
+    const installationId = config.installationId;
+    const endpoint = config.endpointUrl;
+
+    if (!config.enabled) {
+      return;
+    }
 
     const event = normalizeCodexEvent(payload, installationId);
 

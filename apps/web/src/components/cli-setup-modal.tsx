@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import { Terminal, Copy, Check, X, Shield, Cpu, ExternalLink } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Terminal, Copy, Check, X, Shield, Cpu, ExternalLink, Zap, Laptop, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, Authenticated, Unauthenticated } from "convex/react";
+import { api } from "@hackathon-craft-station/backend/convex/_generated/api";
+import Link from "next/link";
+import { SignInButton } from "@clerk/nextjs";
 
 interface CliSetupModalProps {
   isOpen: boolean;
@@ -10,17 +14,34 @@ interface CliSetupModalProps {
 }
 
 export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
-  const [activeTab, setActiveTab] = useState<"claude" | "codex">("claude");
+  const [activeTab, setActiveTab] = useState<"quick" | "claude" | "codex">("quick");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [token, setToken] = useState<string>("bs_tok_local_dev_key");
+
+  const getOrCreateToken = useMutation(api.installations.getUserInstallationToken);
+  const devices = useQuery(api.installations.listUserDevices);
+
+  useEffect(() => {
+    if (isOpen) {
+      getOrCreateToken()
+        .then((res) => {
+          if (res?.token) setToken(res.token);
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, getOrCreateToken]);
 
   if (!isOpen) return null;
+
+  const linkCommand = `npx buildsignal link ${token}`;
+  const installCommand = `npx buildsignal install`;
 
   const claudeConfig = JSON.stringify(
     {
       hooks: {
-        onUserPrompt: "node ./plugins/claude-code/bin/buildsignal-hook.mjs",
-        onToolResult: "node ./plugins/claude-code/bin/buildsignal-hook.mjs",
-        onTurnStop: "node ./plugins/claude-code/bin/buildsignal-hook.mjs",
+        onUserPrompt: "npx @hackathon-craft-station/plugin-claude-code-hook",
+        onToolResult: "npx @hackathon-craft-station/plugin-claude-code-hook",
+        onTurnStop: "npx @hackathon-craft-station/plugin-claude-code-hook",
       },
     },
     null,
@@ -30,8 +51,8 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
   const codexConfig = JSON.stringify(
     {
       hooks: {
-        onMessage: "node ./plugins/codex/bin/codex-hook.mjs",
-        onToolCall: "node ./plugins/codex/bin/codex-hook.mjs",
+        onMessage: "npx @hackathon-craft-station/plugin-codex-hook",
+        onToolCall: "npx @hackathon-craft-station/plugin-codex-hook",
       },
     },
     null,
@@ -42,7 +63,7 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedKey(key);
-      toast.success("¡Configuración copiada al portapapeles!");
+      toast.success("¡Comando copiado al portapapeles!");
       setTimeout(() => setCopiedKey(null), 2000);
     } catch {
       toast.error("No se pudo copiar automáticamente");
@@ -51,7 +72,7 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl apple-acrylic-card p-8 shadow-2xl">
+      <div className="relative w-full max-w-2xl apple-acrylic-card p-6 sm:p-8 shadow-2xl">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -67,10 +88,10 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
           </div>
           <div>
             <h2 className="text-xl font-semibold text-[#1d1d1f] dark:text-white tracking-tight">
-              Configuración de Hooks CLI
+              Conectar Agentes a tu Cuenta
             </h2>
             <p className="text-xs text-[#6e6e73] dark:text-[#86868b] mt-0.5">
-              Conecta BuildSignal a tus agentes locales con 0 filtración de secretos.
+              Tus sesiones de Claude Code y Codex se enviarán a tu estudio personal.
             </p>
           </div>
         </div>
@@ -78,34 +99,86 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
         {/* Apple Segmented Control */}
         <div className="apple-segmented-track mb-6">
           <button
+            onClick={() => setActiveTab("quick")}
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+              activeTab === "quick"
+                ? "apple-segmented-thumb-active"
+                : "text-[#6e6e73] dark:text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-white"
+            }`}
+          >
+            <Zap className="size-3.5 text-[#0071e3] dark:text-[#2997ff]" />
+            <span>Setup Rápido (2 Comandos)</span>
+          </button>
+          <button
             onClick={() => setActiveTab("claude")}
-            className={`flex items-center gap-2 px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${
               activeTab === "claude"
                 ? "apple-segmented-thumb-active"
                 : "text-[#6e6e73] dark:text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-white"
             }`}
           >
             <Cpu className="size-3.5" />
-            <span>Claude Code CLI</span>
+            <span>Claude Code JSON</span>
           </button>
           <button
             onClick={() => setActiveTab("codex")}
-            className={`flex items-center gap-2 px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${
               activeTab === "codex"
                 ? "apple-segmented-thumb-active"
                 : "text-[#6e6e73] dark:text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-white"
             }`}
           >
             <Terminal className="size-3.5" />
-            <span>OpenAI Codex CLI</span>
+            <span>Codex JSON</span>
           </button>
         </div>
 
-        {/* Content Box */}
-        {activeTab === "claude" ? (
+        {/* Tab 1: Quick Command Setup */}
+        {activeTab === "quick" && (
+          <div className="space-y-4">
+            <div>
+              <div className="text-xs font-semibold text-[#1d1d1f] dark:text-white mb-1.5 flex items-center justify-between">
+                <span>1. Vincula tu terminal con tu token personal:</span>
+                <span className="font-mono text-[11px] text-[#30d158]">Paso 1 de 2</span>
+              </div>
+              <div className="relative rounded-[14px] bg-[#121214] p-3.5 font-mono text-xs text-white border border-white/10 flex items-center justify-between">
+                <div className="overflow-x-auto pr-14 text-[#2997ff] select-all">
+                  {linkCommand}
+                </div>
+                <button
+                  onClick={() => copyToClipboard(linkCommand, "link")}
+                  className="apple-btn-secondary absolute right-2.5 top-2.5 py-1 px-2.5 text-xs"
+                >
+                  {copiedKey === "link" ? <Check className="size-3 text-[#30d158]" /> : <Copy className="size-3" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-semibold text-[#1d1d1f] dark:text-white mb-1.5 flex items-center justify-between">
+                <span>2. Instala los hooks en tus configuraciones locales:</span>
+                <span className="font-mono text-[11px] text-[#30d158]">Paso 2 de 2</span>
+              </div>
+              <div className="relative rounded-[14px] bg-[#121214] p-3.5 font-mono text-xs text-white border border-white/10 flex items-center justify-between">
+                <div className="overflow-x-auto pr-14 text-[#30d158] select-all">
+                  {installCommand}
+                </div>
+                <button
+                  onClick={() => copyToClipboard(installCommand, "install")}
+                  className="apple-btn-secondary absolute right-2.5 top-2.5 py-1 px-2.5 text-xs"
+                >
+                  {copiedKey === "install" ? <Check className="size-3 text-[#30d158]" /> : <Copy className="size-3" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Claude Code JSON */}
+        {activeTab === "claude" && (
           <div className="space-y-4">
             <div className="rounded-[16px] bg-black/[0.03] dark:bg-white/[0.04] p-4 text-xs text-[#6e6e73] dark:text-[#86868b] leading-relaxed border border-black/[0.05] dark:border-white/[0.06]">
-              Agrega este bloque a tu archivo de configuración de Claude Code (usualmente en{" "}
+              Agrega este bloque a tu archivo de configuración de Claude Code (en{" "}
               <code className="font-mono text-[#0071e3] dark:text-[#2997ff] font-semibold">
                 ~/.claude/config.json
               </code>
@@ -132,10 +205,13 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
               </button>
             </div>
           </div>
-        ) : (
+        )}
+
+        {/* Tab 3: Codex JSON */}
+        {activeTab === "codex" && (
           <div className="space-y-4">
             <div className="rounded-[16px] bg-black/[0.03] dark:bg-white/[0.04] p-4 text-xs text-[#6e6e73] dark:text-[#86868b] leading-relaxed border border-black/[0.05] dark:border-white/[0.06]">
-              Agrega este bloque a tu configuración de Codex (usualmente en{" "}
+              Agrega este bloque a tu configuración de Codex (en{" "}
               <code className="font-mono text-[#0071e3] dark:text-[#2997ff] font-semibold">
                 ~/.codex/config.json
               </code>
@@ -164,21 +240,30 @@ export function CliSetupModal({ isOpen, onClose }: CliSetupModalProps) {
           </div>
         )}
 
-        {/* Security callout */}
-        <div className="mt-6 flex items-start gap-2.5 rounded-[16px] bg-[#30d158]/10 p-3.5 text-xs text-[#30d158] border border-[#30d158]/20">
+        {/* Security Callout */}
+        <div className="mt-5 flex items-start gap-2.5 rounded-[14px] bg-[#30d158]/10 p-3 text-xs text-[#30d158] border border-[#30d158]/20">
           <Shield className="size-4 shrink-0 mt-0.5" />
           <p className="leading-snug text-[#1d1d1f] dark:text-white">
-            <span className="font-semibold text-[#30d158]">Garantía Zero-Leak:</span> El hook ejecuta localmente el motor de redacción de secretos antes de despachar eventos a Convex.
+            <span className="font-semibold text-[#30d158]">Zero-Leak Local:</span> Los secretos, API keys y rutas de archivos son redactados en tu disco antes del envío.
           </p>
         </div>
 
         {/* Footer actions */}
-        <div className="mt-7 flex justify-end">
+        <div className="mt-6 flex items-center justify-between pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
+          <Link
+            href="/connect"
+            onClick={onClose}
+            className="text-xs text-[#0071e3] dark:text-[#2997ff] hover:underline flex items-center gap-1"
+          >
+            <span>Ver Hub de Conexión Completo</span>
+            <ArrowRight className="size-3" />
+          </Link>
+
           <button
             onClick={onClose}
-            className="apple-btn-primary py-2 px-6 text-xs"
+            className="apple-btn-primary py-1.5 px-5 text-xs"
           >
-            Listo
+            Entendido
           </button>
         </div>
       </div>

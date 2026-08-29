@@ -2,10 +2,32 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const list = query({
-  args: { limit: v.optional(v.number()) },
+  args: {
+    limit: v.optional(v.number()),
+    userId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
-    const moments = await ctx.db.query("moments").order("desc").take(limit);
+    const identity = await ctx.auth.getUserIdentity();
+    const effectiveUserId = args.userId || identity?.subject;
+
+    let moments;
+    if (effectiveUserId) {
+      const userMoments = await ctx.db
+        .query("moments")
+        .withIndex("by_user", (q) => q.eq("userId", effectiveUserId))
+        .order("desc")
+        .take(limit);
+
+      if (userMoments.length > 0) {
+        moments = userMoments;
+      } else {
+        // Graceful fallback to demo moments so user always has interactive content
+        moments = await ctx.db.query("moments").order("desc").take(limit);
+      }
+    } else {
+      moments = await ctx.db.query("moments").order("desc").take(limit);
+    }
 
     // Attach postDraft and session info if available
     const enriched = await Promise.all(
