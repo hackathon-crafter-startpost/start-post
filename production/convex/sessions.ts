@@ -11,6 +11,7 @@ export const list = query({
     const identity = await ctx.auth.getUserIdentity();
     const effectiveUserId = args.userId || identity?.subject;
 
+    let sessionsList: any[] = [];
     if (effectiveUserId) {
       const userSessions = await ctx.db
         .query("sessions")
@@ -19,14 +20,23 @@ export const list = query({
         .take(limit);
 
       if (userSessions.length > 0) {
-        return userSessions;
+        sessionsList = userSessions;
       }
     }
 
-    return await ctx.db
-      .query("sessions")
-      .order("desc")
-      .take(limit);
+    if (sessionsList.length === 0) {
+      sessionsList = await ctx.db
+        .query("sessions")
+        .order("desc")
+        .take(limit);
+    }
+
+    // Filter out ghost/empty sessions (0 events or ping/health checks)
+    return sessionsList.filter((s) => {
+      const isPingOrHealth = s.sessionId?.startsWith("ping_") || s.sessionId?.startsWith("health_check");
+      const hasEvents = (s.eventCount ?? 0) > 0;
+      return hasEvents && !isPingOrHealth;
+    });
   },
 });
 
@@ -39,6 +49,7 @@ export const get = query({
 
 export const create = mutation({
   args: {
+    sessionId: v.optional(v.string()),
     installationId: v.string(),
     source: v.string(),
     projectId: v.optional(v.string()),
@@ -51,6 +62,7 @@ export const create = mutation({
       .first();
 
     return await ctx.db.insert("sessions", {
+      sessionId: args.sessionId || `sess_${Date.now()}`,
       userId: identity?.subject || inst?.userId,
       installationId: args.installationId,
       source: args.source,
@@ -73,5 +85,70 @@ export const finish = mutation({
       endedAt: Date.now(),
     });
     return { success: true };
+  },
+});
+
+export const deleteSession = mutation({
+  args: {
+    sessionId: v.id("sessions"),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return { success: false, reason: "Session not found" };
+
+    if (session.sessionId) {
+      const events = await ctx.db
+        .query("events")
+        .withIndex("by_session_id", (q) => q.eq("sessionId", session.sessionId!))
+        .collect();
+      for (const evt of events) {
+        await ctx.db.delete(evt._id);
+      }
+
+      const moments = await ctx.db
+        .query("moments")
+        .withIndex("by_session", (q) => q.eq("sessionId", session.sessionId!))
+        .collect();
+      for (const m of moments) {
+        const postDrafts = await ctx.db
+          .query("postDrafts")
+          .withIndex("by_moment", (q) => q.eq("momentId", m._id))
+          .collect();
+        for (const pd of postDrafts) {
+          await ctx.db.delete(pd._id);
+        }
+        await ctx.db.delete(m._id);
+      }
+    }
+
+    await ctx.db.delete(session._id);
+    return { success: true };
+  },
+});
+
+export const cleanEmptySessions = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const allSessions = await ctx.db.query("sessions").collect();
+    let cleaned = 0;
+    for (const s of allSessions) {
+      const isPingOrHealth = s.sessionId?.startsWith("ping_") || s.sessionId?.startsWith("health_check");
+      const hasZeroCount = (s.eventCount ?? 0) === 0;
+
+      let eventCountInDb = 0;
+      if (s.sessionId) {
+        const events = await ctx.db
+          .query("events")
+          .withIndex("by_session_id", (q) => q.eq("sessionId", s.sessionId!))
+          .take(1);
+        eventCountInDb = events.length;
+      }
+
+      if (eventCountInDb === 0 && (hasZeroCount || isPingOrHealth || !s.sessionId)) {
+        await ctx.db.delete(s._id);
+        cleaned++;
+      }
+    }
+    return { success: true, cleanedCount: cleaned };
   },
 });

@@ -11,23 +11,7 @@ import { toast } from "sonner";
 import { UserButton, SignInButton } from "@clerk/nextjs";
 
 export default function Header() {
-  const [isSeeding, setIsSeeding] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const seedDemo = useMutation(api.demo.seedOratoriaDemoSession);
-
-  const handleRunDemo = async () => {
-    try {
-      setIsSeeding(true);
-      await seedDemo();
-      toast.success("¡Sesión OratorIA simulada con éxito!", {
-        description: "Momento técnico verificado, tarjeta 1080x1350 y video HyperFrames generados.",
-      });
-    } catch (err: any) {
-      toast.error("Error al simular demo: " + (err?.message || ""));
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
   return (
     <>
@@ -103,12 +87,11 @@ export default function Header() {
           {/* Sub-nav Primary Pill Action CTA */}
           <div className="flex items-center gap-3">
             <button
-              onClick={handleRunDemo}
-              disabled={isSeeding}
-              className="apple-btn-primary py-1.5 px-4 text-[13px] sm:text-[14px]"
+              onClick={() => setIsModalOpen(true)}
+              className="apple-btn-primary py-1.5 px-4 text-[13px] sm:text-[14px] flex items-center gap-2 cursor-pointer"
             >
-              <Play className={`size-3 fill-current ${isSeeding ? "animate-spin" : ""}`} />
-              <span>{isSeeding ? "Sintetizando..." : "Demo OratorIA"}</span>
+              <Terminal className="size-3.5 text-[#2997ff]" />
+              <span>Conectar CLI</span>
             </button>
           </div>
         </div>

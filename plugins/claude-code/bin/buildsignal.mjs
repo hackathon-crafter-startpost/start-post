@@ -711,6 +711,23 @@ async function handleSimulate() {
   }
 }
 
+async function handleClean() {
+  const dir = getConfigDir();
+  const queueFile = path.join(dir, "queue.jsonl");
+  const sessionFile = path.join(dir, "active_sessions.json");
+  if (fs.existsSync(queueFile)) {
+    try {
+      fs.unlinkSync(queueFile);
+    } catch {}
+  }
+  if (fs.existsSync(sessionFile)) {
+    try {
+      fs.unlinkSync(sessionFile);
+    } catch {}
+  }
+  console.log("\n✅ Cola local de eventos y sesiones activas reiniciadas con éxito.\n");
+}
+
 function handleHelp() {
   console.log(`
 BuildSignal CLI — Copiloto de Contenido Técnico para Desarrolladores
@@ -726,6 +743,7 @@ Comandos principales:
   status         Ejecuta diagnósticos del sistema, cola offline y Zero-Leak.
   simulate       Envía una sesión de prueba verificada para comprobar la conexión.
   flush          Drena la cola de eventos locales pendientes a Convex.
+  clean          Limpia la cola local y reinicia las sesiones activas.
   unlink         Desvincula el dispositivo y regresa a modo anónimo.
   help           Muestra esta ayuda.
 
@@ -749,7 +767,6 @@ async function run() {
       await handleWhoami();
       break;
     case "unlink":
-    case "logout":
       await handleUnlink();
       break;
     case "install":
@@ -761,6 +778,10 @@ async function run() {
       break;
     case "flush":
       await handleFlush();
+      break;
+    case "clean":
+    case "reset":
+      await handleClean();
       break;
     case "simulate":
       await handleSimulate();

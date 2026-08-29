@@ -38,15 +38,21 @@ export const ingestBatch = mutation({
       });
     }
 
+    // If events array is empty (e.g. heartbeat, ping, link check, status check),
+    // DO NOT create an empty/ghost session. Just update installation lastSeenAt.
+    if (!args.events || args.events.length === 0) {
+      return { success: true, ingested: 0 };
+    }
+
     // 2. Ensure session exists or create it
     const session = await ctx.db
       .query("sessions")
-      .withIndex("by_installation", (q) => q.eq("installationId", args.installationId))
-      .filter((q) => q.eq(q.field("status"), "active"))
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
       .first();
 
     if (!session) {
       await ctx.db.insert("sessions", {
+        sessionId: args.sessionId,
         userId,
         installationId: args.installationId,
         source: args.source,

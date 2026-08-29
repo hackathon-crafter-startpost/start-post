@@ -31,6 +31,9 @@ async function main() {
     }
 
     const event = normalizeCodexEvent(payload, installationId);
+    if (!event) {
+      return;
+    }
 
     const queue = new EventQueue();
     await queue.enqueue(event);

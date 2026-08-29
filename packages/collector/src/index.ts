@@ -74,31 +74,107 @@ export function createEvent(options: CreateEventOptions): SessionEvent {
 }
 
 /**
+ * Manages active session IDs mapped by workspace directory with a 30-minute sliding window.
+ */
+export function getActiveSessionId(cwd: string = process.cwd()): string {
+  try {
+    const dir = path.join(os.homedir(), ".buildsignal");
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const sessionFile = path.join(dir, "active_sessions.json");
+    let state: Record<string, { sessionId: string; lastSeenAt: number }> = {};
+    if (fs.existsSync(sessionFile)) {
+      try {
+        state = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
+      } catch {}
+    }
+
+    const key = Buffer.from(cwd.toLowerCase().replace(/\\/g, "/")).toString("base64").substring(0, 16);
+    const now = Date.now();
+    const existing = state[key];
+
+    // Session window: 30 minutes of inactivity
+    if (existing && existing.sessionId && now - existing.lastSeenAt < 30 * 60 * 1000) {
+      state[key] = { sessionId: existing.sessionId, lastSeenAt: now };
+      try {
+        fs.writeFileSync(sessionFile, JSON.stringify(state, null, 2), "utf8");
+      } catch {}
+      return existing.sessionId;
+    }
+
+    const rand = Math.random().toString(36).substring(2, 8);
+    const newSessionId = `sess_${now}_${rand}`;
+    state[key] = { sessionId: newSessionId, lastSeenAt: now };
+    try {
+      fs.writeFileSync(sessionFile, JSON.stringify(state, null, 2), "utf8");
+    } catch {}
+    return newSessionId;
+  } catch {
+    return `sess_${Date.now()}_default`;
+  }
+}
+
+/**
  * Normalizes Claude Code CLI hook messages into standard SessionEvents.
  */
 export function normalizeClaudeEvent(
   raw: Record<string, any>,
   installationId: string
-): SessionEvent {
-  const sessionId = raw.session_id || raw.conversation_id || "claude-session-default";
-  let eventType: EventType = "turn_stopped";
+): SessionEvent | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const hasPrompt = !!(raw.prompt || raw.message || raw.user_prompt || raw.input?.prompt || raw.text);
+  const hasTool = !!(raw.tool || raw.name || raw.tool_name || raw.toolName || raw.command || raw.input?.command);
+  const hasFile = !!(raw.file_path || raw.filePath || raw.diff || raw.input?.file_path || raw.input?.filePath);
+  const hasOutput = !!(raw.output || raw.result || raw.tool_result);
+  const isLifecycle = raw.type === "session_started" || raw.type === "session_ended";
+
+  if (!hasPrompt && !hasTool && !hasFile && !hasOutput && !isLifecycle && !raw.type && !raw.summary) {
+    return null;
+  }
+
+  const explicitSessionId =
+    raw.session_id ||
+    raw.conversation_id ||
+    raw.sessionId ||
+    process.env.CLAUDE_SESSION_ID ||
+    process.env.SESSION_ID ||
+    process.env.CONVERSATION_ID;
+
+  const sessionId = explicitSessionId || getActiveSessionId(process.cwd());
+  let eventType: EventType = "tool_result";
   let payload: Record<string, unknown> = {};
 
-  if (raw.type === "user_message" || raw.type === "prompt" || raw.user_prompt) {
+  if (raw.type === "user_message" || raw.type === "prompt" || (hasPrompt && !hasTool && !hasFile)) {
     eventType = "user_prompt";
     payload = {
-      prompt: raw.message || raw.user_prompt || raw.prompt || "",
+      prompt: raw.prompt || raw.message || raw.user_prompt || raw.input?.prompt || raw.text || "",
     };
-  } else if (raw.type === "tool_use" || raw.type === "tool_result") {
-    const tool = raw.tool || raw.name || "";
-    const command = raw.input?.command || raw.command || "";
-    const output = raw.output || raw.result || "";
-    const exitCode = raw.exit_code ?? (raw.error ? 1 : 0);
+  } else if (raw.type === "tool_use" || raw.type === "tool_result" || hasTool || hasFile) {
+    const tool = raw.tool || raw.name || raw.tool_name || raw.toolName || "";
+    const command = raw.command || raw.cmd || raw.input?.command || raw.tool_input?.command || "";
+    const output = raw.output || raw.result || raw.tool_result || raw.stdout || raw.stderr || "";
+    const exitCode = raw.exit_code ?? raw.exitCode ?? (raw.error ? 1 : 0);
+    const filePath = raw.file_path || raw.filePath || raw.path || raw.input?.file_path || raw.input?.path || "";
 
-    // Detect test execution
-    if (command.includes("test") || command.includes("vitest") || command.includes("jest")) {
+    if (
+      command &&
+      (command.includes("test") ||
+        command.includes("vitest") ||
+        command.includes("jest") ||
+        command.includes("pytest") ||
+        command.includes("cargo test") ||
+        command.includes("go test"))
+    ) {
       eventType = exitCode === 0 ? "test_passed" : "test_failed";
-    } else if (tool === "Edit" || tool === "Write" || tool === "replace_file_content") {
+    } else if (
+      tool === "Edit" ||
+      tool === "Write" ||
+      tool === "replace_file_content" ||
+      tool === "write_to_file" ||
+      hasFile
+    ) {
       eventType = "file_changed";
     } else {
       eventType = "tool_result";
@@ -109,13 +185,19 @@ export function normalizeClaudeEvent(
       command,
       output,
       exitCode,
-      filePath: raw.input?.file_path || raw.file_path || raw.filePath,
+      filePath,
+      diff: raw.diff || raw.changes || raw.input?.diff,
+      codeBefore: raw.codeBefore || raw.code_before,
+      codeAfter: raw.codeAfter || raw.code_after,
     };
   } else if (raw.type === "session_started") {
     eventType = "session_started";
     payload = { ...raw };
   } else if (raw.type === "session_ended") {
     eventType = "session_ended";
+    payload = { ...raw };
+  } else if (raw.type === "turn_stopped" || raw.type === "stop") {
+    eventType = "turn_stopped";
     payload = { ...raw };
   } else {
     payload = { ...raw };
@@ -137,31 +219,64 @@ export function normalizeClaudeEvent(
 export function normalizeCodexEvent(
   raw: Record<string, any>,
   installationId: string
-): SessionEvent {
-  const sessionId = raw.conversation_id || raw.session_id || "codex-session-default";
+): SessionEvent | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const hasPrompt = !!(raw.user_input || raw.prompt || raw.message);
+  const hasCommand = !!(raw.command || raw.cmd);
+  const hasFile = !!(raw.file_path || raw.filePath || raw.diff);
+  const hasEvent = !!raw.event_type || !!raw.type;
+
+  if (!hasPrompt && !hasCommand && !hasFile && !hasEvent && !raw.summary) {
+    return null;
+  }
+
+  const explicitSessionId =
+    raw.conversation_id ||
+    raw.session_id ||
+    raw.sessionId ||
+    process.env.CODEX_SESSION_ID ||
+    process.env.SESSION_ID;
+
+  const sessionId = explicitSessionId || getActiveSessionId(process.cwd());
   let eventType: EventType = "tool_result";
   let payload: Record<string, unknown> = {};
 
-  if (raw.event_type === "prompt" || raw.type === "prompt") {
+  if (raw.event_type === "prompt" || raw.type === "prompt" || (hasPrompt && !hasCommand && !hasFile)) {
     eventType = "user_prompt";
     payload = {
-      prompt: raw.user_input || raw.prompt || "",
+      prompt: raw.user_input || raw.prompt || raw.message || "",
     };
-  } else if (raw.event_type === "file_change") {
+  } else if (raw.event_type === "file_change" || hasFile) {
     eventType = "file_changed";
     payload = {
-      filePath: raw.file_path,
+      filePath: raw.file_path || raw.filePath,
       diff: raw.diff,
+      codeBefore: raw.codeBefore,
+      codeAfter: raw.codeAfter,
     };
-  } else if (raw.event_type === "command_result") {
-    const cmd = raw.command || "";
-    const exitCode = raw.exit_code ?? 0;
-    if (cmd.includes("test")) {
+  } else if (raw.event_type === "command_result" || hasCommand) {
+    const cmd = raw.command || raw.cmd || "";
+    const exitCode = raw.exit_code ?? raw.exitCode ?? 0;
+    if (
+      cmd &&
+      (cmd.includes("test") ||
+        cmd.includes("vitest") ||
+        cmd.includes("jest") ||
+        cmd.includes("pytest") ||
+        cmd.includes("cargo test") ||
+        cmd.includes("go test"))
+    ) {
       eventType = exitCode === 0 ? "test_passed" : "test_failed";
     } else {
       eventType = "tool_result";
     }
-    payload = { ...raw };
+    payload = {
+      command: cmd,
+      exitCode,
+      output: raw.output || raw.result || "",
+      ...raw,
+    };
   } else {
     payload = { ...raw };
   }

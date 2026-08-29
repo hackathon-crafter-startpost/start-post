@@ -154,4 +154,18 @@ describe("Collector Engine", () => {
     expect(linkRes.success).toBe(true);
     expect(linkRes.installationId).toBe("bs_tok_verified_999");
   });
+
+  it("returns null for empty inputs to prevent noise and empty sessions", () => {
+    expect(normalizeClaudeEvent({}, "inst-1")).toBeNull();
+    expect(normalizeClaudeEvent(null as any, "inst-1")).toBeNull();
+    expect(normalizeCodexEvent({}, "inst-1")).toBeNull();
+  });
+
+  it("manages and groups active session ID for the same workspace", async () => {
+    const { getActiveSessionId } = await import("../src/index");
+    const id1 = getActiveSessionId("C:/projects/test-repo");
+    const id2 = getActiveSessionId("C:/projects/test-repo");
+    expect(id1).toBe(id2);
+    expect(id1).toMatch(/^sess_\d+_[a-z0-9]+$/);
+  });
 });
