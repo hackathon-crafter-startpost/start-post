@@ -66,15 +66,10 @@ export const analyzeSession = mutation({
       : "Se aplicó la corrección y las pruebas volvieron a pasar en verde.";
     let lesson = "Antes de asumir fallos en el algoritmo principal, verifica el comportamiento por defecto de las librerías o APIs externas.";
 
-    // Check if OratorIA specific demo keywords exist
-    if (userPrompt.toLowerCase().includes("filler") || userPrompt.toLowerCase().includes("muletilla") || userPrompt.toLowerCase().includes("audio") || userPrompt.toLowerCase().includes("smoothing")) {
-      title = "El error de suavizado en Web Audio API";
-      problem = "El detector de muletillas arrojaba 40% de falsos positivos en grabaciones cortas.";
-      discovery = "Web Audio AnalyserNode tiene smoothingTimeConstant = 0.8 por defecto, promediando espectros entre frames consecutivos y distorsionando transitorios rápidos.";
-      solution = "Desactivar el suavizado temporal (smoothingTimeConstant = 0.0) y ampliar la ventana de análisis espectral.";
-      lesson = "Antes de culpar a tu algoritmo o modelo, audita el preprocesamiento por defecto de la API del navegador.";
-      codeBefore = codeBefore || "analyser.smoothingTimeConstant = 0.8; // default";
-      codeAfter = codeAfter || "analyser.smoothingTimeConstant = 0.0; // fix";
+    // Purely extract technical details from real session evidence
+    if (codeBefore && codeAfter) {
+      discovery = `Se descubrió que la configuración previa provocaba anomalías: ${codeBefore.trim()}`;
+      solution = `Se implementó la corrección verificada: ${codeAfter.trim()}`;
     }
 
     const breakdown = {
