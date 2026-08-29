@@ -249,11 +249,12 @@ export default function DashboardPage() {
 
   const handlePublishToBuffer = async (mode: "addToQueue" | "now" | "idea") => {
     if (!activeMoment?._id) return;
-    if (!bufferSettings?.apiKey || !bufferSettings?.channelId) {
-      toast.info("Configura tu cuenta de Buffer primero para publicar automáticamente.");
+    if (!bufferSettings?.apiKey) {
+      toast.info("Abre la configuración de Buffer para conectar tu cuenta.");
       setIsBufferModalOpen(true);
       return;
     }
+
 
     try {
       setIsPublishingBuffer(true);

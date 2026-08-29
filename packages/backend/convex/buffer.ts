@@ -34,18 +34,32 @@ export const getSettings = query({
       settings = await ctx.db.query("bufferSettings").first();
     }
 
-    if (!settings) return null;
+    const envApiKey = process.env.BUFFER_API_KEY;
+    const effectiveApiKey = settings?.apiKey || envApiKey;
+
+    if (!effectiveApiKey) return null;
 
     // Mask API key for client display
     return {
-      ...settings,
+      _id: settings?._id,
+      apiKey: effectiveApiKey,
       maskedApiKey:
-        settings.apiKey.length > 8
-          ? `${settings.apiKey.slice(0, 4)}...${settings.apiKey.slice(-4)}`
+        effectiveApiKey.length > 8
+          ? `${effectiveApiKey.slice(0, 4)}...${effectiveApiKey.slice(-4)}`
           : "••••••••",
+      organizationId: settings?.organizationId,
+      organizationName: settings?.organizationName,
+      channelId: settings?.channelId,
+      channelName: settings?.channelName,
+      channelService: settings?.channelService,
+      channelAvatar: settings?.channelAvatar,
+      autoPublish: settings?.autoPublish ?? false,
+      publishMode: settings?.publishMode || "addToQueue",
+      isFromEnv: !settings?.apiKey && Boolean(envApiKey),
     };
   },
 });
+
 
 export const saveSettings = mutation({
   args: {
@@ -292,13 +306,37 @@ export const publishPost = action({
       };
     }
 
-    const channelId = args.channelIdOverride || settings?.channelId;
+    let channelId = args.channelIdOverride || settings?.channelId;
+    let channelName = settings?.channelName;
+    let channelService = settings?.channelService;
+
+    if (!channelId) {
+      // Auto-discover the first channel connected to the Buffer account
+      try {
+        const { organizations } = await fetchBufferAccountAndOrgs(apiKey);
+        if (organizations.length > 0) {
+          const channels = await fetchBufferChannels(apiKey, organizations[0].id);
+          if (channels.length > 0) {
+            channelId = channels[0].id;
+            channelName = channels[0].name;
+            channelService = channels[0].service;
+          }
+        }
+      } catch (err: any) {
+        return {
+          success: false,
+          error: `No se pudo encontrar canales en Buffer: ${err.message}`,
+        };
+      }
+    }
+
     if (!channelId) {
       return {
         success: false,
-        error: "No hay ningún canal seleccionado para publicar en Buffer.",
+        error: "No se encontró ningún canal conectado en tu cuenta de Buffer. Conecta un canal (LinkedIn, Twitter, etc.) en Buffer.",
       };
     }
+
 
     // 2. Fetch Moment and PostDraft
     const moment: any = await ctx.runQuery(api.moments.get, {
@@ -355,8 +393,8 @@ export const publishPost = action({
         postDraftId: draft?._id,
         bufferPostId: result.post.id,
         channelId,
-        channelName: settings?.channelName,
-        channelService: settings?.channelService,
+        channelName: channelName || settings?.channelName,
+        channelService: channelService || settings?.channelService,
         status: mode === "now" ? "published" : "scheduled",
         mode,
         text: fullText,
@@ -368,21 +406,22 @@ export const publishPost = action({
         success: true,
         postId: result.post.id,
         status: result.post.status || mode,
-        channelName: settings?.channelName,
+        channelName: channelName || settings?.channelName,
       };
     } else {
       await ctx.runMutation(api.buffer.recordPublication, {
         momentId: args.momentId,
         postDraftId: draft?._id,
         channelId,
-        channelName: settings?.channelName,
-        channelService: settings?.channelService,
+        channelName: channelName || settings?.channelName,
+        channelService: channelService || settings?.channelService,
         status: "failed",
         mode,
         text: fullText,
         imageUrl,
         errorMessage: result.error,
       });
+
 
       return {
         success: false,

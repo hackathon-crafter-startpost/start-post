@@ -59,17 +59,32 @@ export function BufferIntegrationModal({
     }
   }, [settings]);
 
-  // When modal opens and settings exist, load channels
+  // When modal opens and settings exist, load organizations and channels
   useEffect(() => {
-    if (isOpen && settings?.apiKey && settings?.organizationId) {
-      fetchChannels({
-        organizationId: settings.organizationId,
-        apiKeyOverride: settings.apiKey,
-      })
-        .then((ch) => setChannels(ch || []))
+    const activeKey = apiKey || settings?.apiKey;
+    if (isOpen && activeKey && channels.length === 0 && !isVerifying) {
+      testConnection({ apiKeyOverride: activeKey })
+        .then(async (res) => {
+          if (res.success) {
+            setOrganizations(res.organizations || []);
+            if (res.organizations && res.organizations.length > 0) {
+              const orgId = selectedOrgId || settings?.organizationId || res.organizations[0].id;
+              setSelectedOrgId(orgId);
+              const ch = await fetchChannels({
+                organizationId: orgId,
+                apiKeyOverride: activeKey,
+              });
+              setChannels(ch || []);
+              if (ch && ch.length > 0 && !selectedChannelId) {
+                setSelectedChannelId(settings?.channelId || ch[0].id);
+              }
+            }
+          }
+        })
         .catch(() => {});
     }
-  }, [isOpen, settings, fetchChannels]);
+  }, [isOpen, settings, apiKey]);
+
 
   if (!isOpen) return null;
 
