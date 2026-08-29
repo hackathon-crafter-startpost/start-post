@@ -13,7 +13,7 @@ export default function DashboardSessionsPage() {
   const [filterType, setFilterType] = useState<string>("all");
 
   const activeSessionId =
-    selectedSessionId || (sessions && sessions.length > 0 ? (sessions[0]._id as string) : "");
+    selectedSessionId || (sessions && sessions.length > 0 ? (sessions[0].sessionId || (sessions[0]._id as string)) : "");
 
   const events = useQuery(
     api.events.listBySession,
@@ -76,11 +76,12 @@ export default function DashboardSessionsPage() {
             ) : (
               <div className="flex flex-col gap-3 max-h-[720px] overflow-y-auto pr-1">
                 {sessions.map((s) => {
-                  const isSelected = activeSessionId === (s._id as string);
+                  const sessionIdentifier = s.sessionId || (s._id as string);
+                  const isSelected = activeSessionId === sessionIdentifier;
                   return (
                     <div
                       key={s._id}
-                      onClick={() => setSelectedSessionId(s._id as string)}
+                      onClick={() => setSelectedSessionId(sessionIdentifier)}
                       className={`apple-acrylic-card p-4 sm:p-5 transition-all cursor-pointer ${
                         isSelected
                           ? "ring-2 ring-[#0066cc] dark:ring-[#2997ff] scale-[1.01]"
@@ -101,7 +102,7 @@ export default function DashboardSessionsPage() {
                       </div>
 
                       <div className="text-[11px] font-mono text-[#6e6e73] dark:text-[#86868b] mt-1.5 truncate">
-                        ID: {s._id}
+                        ID: {sessionIdentifier}
                       </div>
 
                       <div className="flex items-center gap-2 mt-3 text-[11px]">

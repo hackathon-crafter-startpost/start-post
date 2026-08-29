@@ -39,14 +39,22 @@ export const ingestBatch = mutation({
     }
 
     // 2. Ensure session exists or create it
-    const session = await ctx.db
-      .query("sessions")
-      .withIndex("by_installation", (q) => q.eq("installationId", args.installationId))
-      .filter((q) => q.eq(q.field("status"), "active"))
-      .first();
+    let session = null;
+    try {
+      session = await ctx.db
+        .query("sessions")
+        .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
+        .first();
+    } catch {
+      session = await ctx.db
+        .query("sessions")
+        .withIndex("by_installation", (q) => q.eq("installationId", args.installationId))
+        .first();
+    }
 
     if (!session) {
       await ctx.db.insert("sessions", {
+        sessionId: args.sessionId,
         userId,
         installationId: args.installationId,
         source: args.source,
@@ -57,6 +65,7 @@ export const ingestBatch = mutation({
       });
     } else {
       await ctx.db.patch(session._id, {
+        sessionId: args.sessionId,
         userId: userId || session.userId,
         eventCount: (session.eventCount || 0) + args.events.length,
       });

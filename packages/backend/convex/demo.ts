@@ -9,6 +9,7 @@ export const seedOratoriaDemoSession = mutation({
 
     // 1. Create Session
     await ctx.db.insert("sessions", {
+      sessionId,
       installationId,
       source: "claude-code",
       status: "completed",

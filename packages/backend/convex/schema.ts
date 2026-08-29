@@ -34,6 +34,7 @@ export default defineSchema({
     .index("by_repo_hash", ["repositoryHash"]),
 
   sessions: defineTable({
+    sessionId: v.optional(v.string()),
     userId: v.optional(v.string()),
     projectId: v.optional(v.string()),
     installationId: v.string(),
@@ -44,6 +45,7 @@ export default defineSchema({
     analysisStatus: v.string(), // "pending" | "analyzed" | "skipped"
     eventCount: v.optional(v.number()),
   })
+    .index("by_session_id", ["sessionId"])
     .index("by_installation", ["installationId"])
     .index("by_status", ["status"])
     .index("by_user", ["userId"]),
